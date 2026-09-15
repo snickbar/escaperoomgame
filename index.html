@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escape Room Card Game</title>
+<style>
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #14161c;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  .table {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .card {
+    width: 220px;
+    height: 320px;
+    perspective: 1000px;
+    cursor: pointer;
+  }
+
+  .card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+  }
+
+  .card.flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    box-sizing: border-box;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .card-back {
+    background: linear-gradient(135deg, #2b2f3a, #1a1c22);
+    border: 2px solid #3d4250;
+  }
+
+  .card-back .card-number {
+    font-size: 64px;
+    font-weight: 700;
+    color: #6c7a96;
+  }
+
+  .card-front {
+    background: linear-gradient(135deg, #2f6a4f, #1c3f31);
+    border: 2px solid #4caf7d;
+    transform: rotateY(180deg);
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card-front .message {
+    font-size: 20px;
+    font-weight: 600;
+    color: #d8f5e6;
+  }
+
+  .hint {
+    color: #7a8194;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<div class="table">
+  <div class="card" id="card1">
+    <div class="card-inner">
+      <div class="card-face card-back">
+        <div class="card-number">1</div>
+      </div>
+      <div class="card-face card-front">
+        <div class="message">✓ Success!</div>
+        <div class="hint">(placeholder — puzzle logic goes here)</div>
+      </div>
+    </div>
+  </div>
+  <div class="hint">Click the card to flip it</div>
+</div>
+
+<script>
+  document.getElementById('card1').addEventListener('click', function () {
+    this.classList.toggle('flipped');
+  });
+</script>
+
+</body>
+</html>
