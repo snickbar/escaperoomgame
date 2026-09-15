@@ -9,28 +9,110 @@
     color-scheme: dark;
   }
 
+  * {
+    box-sizing: border-box;
+  }
+
   body {
     margin: 0;
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     background: #14161c;
     font-family: system-ui, -apple-system, sans-serif;
+    color: #cfd3dc;
+    padding: 24px 16px 60px;
   }
 
-  .table {
+  h1 {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #e4e7ee;
+    margin: 0 0 24px;
+  }
+
+  .scene {
+    max-width: 960px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 24px;
+    gap: 40px;
   }
 
+  /* --- Deck pile --- */
+
+  .deck-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .deck {
+    position: relative;
+    width: 120px;
+    height: 168px;
+    cursor: pointer;
+  }
+
+  .deck[data-empty="true"] {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .deck-card {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: repeating-linear-gradient(135deg, #2b2f3a, #2b2f3a 8px, #262a34 8px, #262a34 16px);
+    border: 2px solid #3d4250;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease;
+  }
+
+  .deck:hover .deck-card {
+    transform: translateY(-4px);
+  }
+
+  .deck-caption {
+    text-align: center;
+    font-size: 13px;
+    color: #7a8194;
+    line-height: 1.5;
+  }
+
+  .deck-caption strong {
+    color: #b7bcc9;
+    font-size: 15px;
+  }
+
+  /* --- Table --- */
+
+  .table {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 16px;
+    justify-items: center;
+  }
+
+  /* --- Card --- */
+
   .card {
-    width: 220px;
-    height: 320px;
+    width: 110px;
+    height: 154px;
     perspective: 1000px;
     cursor: pointer;
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+    animation: dealIn 0.4s ease forwards;
+  }
+
+  @keyframes dealIn {
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
   .card-inner {
@@ -50,14 +132,14 @@
     width: 100%;
     height: 100%;
     backface-visibility: hidden;
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 20px;
+    padding: 10px;
     box-sizing: border-box;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   }
 
   .card-back {
@@ -66,7 +148,7 @@
   }
 
   .card-back .card-number {
-    font-size: 64px;
+    font-size: 40px;
     font-weight: 700;
     color: #6c7a96;
   }
@@ -76,42 +158,95 @@
     border: 2px solid #4caf7d;
     transform: rotateY(180deg);
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .card-front .message {
-    font-size: 20px;
+    font-size: 15px;
     font-weight: 600;
     color: #d8f5e6;
   }
 
+  .card-front .hint {
+    font-size: 11px;
+    color: #9fd6b8;
+  }
+
   .hint {
     color: #7a8194;
-    font-size: 14px;
+    font-size: 13px;
   }
 </style>
 </head>
 <body>
 
-<div class="table">
-  <div class="card" id="card1">
-    <div class="card-inner">
-      <div class="card-face card-back">
-        <div class="card-number">1</div>
-      </div>
-      <div class="card-face card-front">
-        <div class="message">✓ Success!</div>
-        <div class="hint">(placeholder — puzzle logic goes here)</div>
-      </div>
+<h1>Escape Room Card Game</h1>
+
+<div class="scene">
+  <div class="deck-wrap">
+    <div class="deck" id="deck">
+      <div class="deck-card" style="transform: translate(3px, 3px) rotate(-2deg);"></div>
+      <div class="deck-card" style="transform: translate(-2px, 1px) rotate(1.5deg);"></div>
+      <div class="deck-card" style="transform: translate(1px, -2px) rotate(-1deg);"></div>
+      <div class="deck-card"></div>
+    </div>
+    <div class="deck-caption">
+      <strong id="deckCount">12</strong> cards in deck<br>
+      <span id="deckHint">Click the deck to deal</span>
     </div>
   </div>
-  <div class="hint">Click the card to flip it</div>
+
+  <div class="table" id="table"></div>
 </div>
 
 <script>
-  document.getElementById('card1').addEventListener('click', function () {
-    this.classList.toggle('flipped');
-  });
+  const CARD_COUNT = 12;
+
+  function shuffledNumbers(count) {
+    const nums = Array.from({ length: count }, (_, i) => i + 1);
+    for (let i = nums.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [nums[i], nums[j]] = [nums[j], nums[i]];
+    }
+    return nums;
+  }
+
+  const deckEl = document.getElementById('deck');
+  const tableEl = document.getElementById('table');
+  const deckCountEl = document.getElementById('deckCount');
+  const deckHintEl = document.getElementById('deckHint');
+
+  function dealCards() {
+    const numbers = shuffledNumbers(CARD_COUNT);
+
+    numbers.forEach((num, index) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.animationDelay = (index * 0.06) + 's';
+      card.dataset.number = num;
+
+      card.innerHTML = `
+        <div class="card-inner">
+          <div class="card-face card-back">
+            <div class="card-number">${num}</div>
+          </div>
+          <div class="card-face card-front">
+            <div class="message">&#10003; Success!</div>
+            <div class="hint">(placeholder for card ${num})</div>
+          </div>
+        </div>
+      `;
+
+      card.addEventListener('click', () => card.classList.toggle('flipped'));
+      tableEl.appendChild(card);
+    });
+
+    deckEl.dataset.empty = 'true';
+    deckCountEl.textContent = '0';
+    deckHintEl.textContent = 'All cards dealt';
+  }
+
+  deckEl.addEventListener('click', dealCards);
 </script>
 
 </body>
