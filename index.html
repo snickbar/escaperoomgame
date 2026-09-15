@@ -181,6 +181,19 @@
     color: #9fd6b8;
   }
 
+  .card-front.story {
+    background: linear-gradient(135deg, #6a4f2f, #3f2f1c);
+    border-color: #cfa04c;
+  }
+
+  .card-front.story .message {
+    color: #f5e6d8;
+  }
+
+  .card-front.story .hint {
+    color: #d6b89f;
+  }
+
   .hint {
     color: #7a8194;
     font-size: 13px;
@@ -249,6 +262,23 @@
     color: #9fd6b8;
   }
 
+  .zoom-card.story {
+    background: linear-gradient(135deg, #6a4f2f, #3f2f1c);
+    border-color: #cfa04c;
+  }
+
+  .zoom-card.story .zoom-number {
+    color: #d6b89f;
+  }
+
+  .zoom-card.story .zoom-message {
+    color: #f5e6d8;
+  }
+
+  .zoom-card.story .zoom-hint {
+    color: #d6b89f;
+  }
+
   .zoom-close {
     position: absolute;
     top: 12px;
@@ -294,10 +324,10 @@
 </div>
 
 <div class="zoom-overlay" id="zoomOverlay">
-  <div class="zoom-card">
+  <div class="zoom-card" id="zoomCard">
     <button class="zoom-close" id="zoomClose" aria-label="Close">&times;</button>
     <div class="zoom-number" id="zoomNumber"></div>
-    <div class="zoom-message">&#10003; Success!</div>
+    <div class="zoom-message" id="zoomMessage"></div>
     <div class="zoom-hint" id="zoomHint"></div>
   </div>
 </div>
@@ -314,18 +344,45 @@
     return nums;
   }
 
+  const STORY_NUMBER = 1;
+
   const deckEl = document.getElementById('deck');
   const deckWrapEl = document.getElementById('deckWrap');
   const tableEl = document.getElementById('table');
   const deckCountEl = document.getElementById('deckCount');
   const deckHintEl = document.getElementById('deckHint');
 
+  const cardContent = new Map();
+
+  function buildCardContent(numbers) {
+    const otherNumbers = numbers.filter((n) => n !== STORY_NUMBER);
+    const targetNumber = otherNumbers[Math.floor(Math.random() * otherNumbers.length)];
+
+    numbers.forEach((num) => {
+      if (num === STORY_NUMBER) {
+        cardContent.set(num, {
+          isStory: true,
+          message: 'Help Lucy find her lost dog!',
+          hint: 'Flip over card ' + targetNumber + '!',
+        });
+      } else {
+        cardContent.set(num, {
+          isStory: false,
+          message: '✓ Success!',
+          hint: '(placeholder for card ' + num + ')',
+        });
+      }
+    });
+  }
+
   function dealCards() {
     const numbers = shuffledNumbers(CARD_COUNT);
+    buildCardContent(numbers);
 
     numbers.forEach((num, index) => {
+      const content = cardContent.get(num);
       const card = document.createElement('div');
-      card.className = 'card';
+      card.className = 'card' + (content.isStory ? ' flipped' : '');
       card.style.animationDelay = (index * 0.06) + 's';
       card.dataset.number = num;
 
@@ -334,9 +391,9 @@
           <div class="card-face card-back">
             <div class="card-number">${num}</div>
           </div>
-          <div class="card-face card-front">
-            <div class="message">&#10003; Success!</div>
-            <div class="hint">(placeholder for card ${num})</div>
+          <div class="card-face card-front${content.isStory ? ' story' : ''}">
+            <div class="message">${content.message}</div>
+            <div class="hint">${content.hint}</div>
           </div>
         </div>
       `;
@@ -364,13 +421,18 @@
   deckEl.addEventListener('click', dealCards);
 
   const zoomOverlay = document.getElementById('zoomOverlay');
+  const zoomCardEl = document.getElementById('zoomCard');
   const zoomNumberEl = document.getElementById('zoomNumber');
+  const zoomMessageEl = document.getElementById('zoomMessage');
   const zoomHintEl = document.getElementById('zoomHint');
   const zoomCloseEl = document.getElementById('zoomClose');
 
   function openZoom(num) {
+    const content = cardContent.get(num);
+    zoomCardEl.classList.toggle('story', content.isStory);
     zoomNumberEl.textContent = 'Card ' + num;
-    zoomHintEl.textContent = '(placeholder for card ' + num + ')';
+    zoomMessageEl.textContent = content.message;
+    zoomHintEl.textContent = content.hint;
     zoomOverlay.classList.add('open');
   }
 
