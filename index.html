@@ -335,13 +335,8 @@
 <script>
   const CARD_COUNT = 12;
 
-  function shuffledNumbers(count) {
-    const nums = Array.from({ length: count }, (_, i) => i + 1);
-    for (let i = nums.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [nums[i], nums[j]] = [nums[j], nums[i]];
-    }
-    return nums;
+  function orderedNumbers(count) {
+    return Array.from({ length: count }, (_, i) => i + 1);
   }
 
   const STORY_NUMBER = 1;
@@ -376,7 +371,7 @@
   }
 
   function dealCards() {
-    const numbers = shuffledNumbers(CARD_COUNT);
+    const numbers = orderedNumbers(CARD_COUNT);
     buildCardContent(numbers);
 
     numbers.forEach((num, index) => {
