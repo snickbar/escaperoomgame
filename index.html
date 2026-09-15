@@ -46,6 +46,15 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    opacity: 1;
+    transform: scale(1);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+
+  .deck-wrap.gone {
+    opacity: 0;
+    transform: scale(0.8);
+    pointer-events: none;
   }
 
   .deck {
@@ -268,7 +277,7 @@
 <h1>Escape Room Card Game</h1>
 
 <div class="scene">
-  <div class="deck-wrap">
+  <div class="deck-wrap" id="deckWrap">
     <div class="deck" id="deck">
       <div class="deck-card" style="transform: translate(3px, 3px) rotate(-2deg);"></div>
       <div class="deck-card" style="transform: translate(-2px, 1px) rotate(1.5deg);"></div>
@@ -306,6 +315,7 @@
   }
 
   const deckEl = document.getElementById('deck');
+  const deckWrapEl = document.getElementById('deckWrap');
   const tableEl = document.getElementById('table');
   const deckCountEl = document.getElementById('deckCount');
   const deckHintEl = document.getElementById('deckHint');
@@ -344,6 +354,11 @@
     deckEl.dataset.empty = 'true';
     deckCountEl.textContent = '0';
     deckHintEl.textContent = 'All cards dealt';
+
+    deckWrapEl.classList.add('gone');
+    deckWrapEl.addEventListener('transitionend', () => {
+      deckWrapEl.style.display = 'none';
+    }, { once: true });
   }
 
   deckEl.addEventListener('click', dealCards);
