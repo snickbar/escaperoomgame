@@ -125,16 +125,21 @@
   /* --- Card --- */
 
   .card {
+    position: relative;
     width: 110px;
     height: 154px;
     perspective: 1000px;
     cursor: pointer;
-    opacity: 0;
-    transform: translateY(12px) scale(0.9);
+    opacity: 1;
+    transform: none;
     animation: dealIn 0.4s ease forwards;
   }
 
   @keyframes dealIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.9);
+    }
     to {
       opacity: 1;
       transform: translateY(0) scale(1);
@@ -152,6 +157,34 @@
     20%, 80% { transform: translateX(5px); }
     30%, 50%, 70% { transform: translateX(-7px); }
     40%, 60% { transform: translateX(7px); }
+  }
+
+  .wrong-mark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    font-weight: 800;
+    color: #ff5c5c;
+    text-shadow: 0 0 14px rgba(255, 92, 92, 0.85);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    transition: opacity 0.2s ease;
+  }
+
+  .card.wrong .wrong-mark {
+    opacity: 1;
+    animation: wrongPop 0.5s ease;
+  }
+
+  @keyframes wrongPop {
+    0% { opacity: 0; transform: scale(0.4); }
+    35% { opacity: 1; transform: scale(1.2); }
+    60% { transform: scale(1); }
+    100% { opacity: 1; transform: scale(1); }
   }
 
   .card-inner {
@@ -425,6 +458,32 @@
   .gameover-button:hover {
     background: #ea6868;
   }
+
+  /* --- Toast --- */
+
+  .toast {
+    position: fixed;
+    top: 116px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-14px);
+    background: rgba(224, 82, 82, 0.95);
+    color: #fff;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 12px 22px;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 1200;
+    text-align: center;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 </style>
 </head>
 <body>
@@ -432,6 +491,8 @@
 <h1>Escape Room Card Game</h1>
 
 <div class="lives" id="livesDisplay"></div>
+
+<div class="toast" id="toast"></div>
 
 <div class="scene">
   <div class="deck-wrap" id="deckWrap">
@@ -462,7 +523,7 @@
 <div class="gameover-overlay" id="gameOverOverlay">
   <div class="gameover-card">
     <div class="gameover-title">&#128128; Game Over</div>
-    <div class="gameover-message">You ran out of lives. Give it another try!</div>
+    <div class="gameover-message">Sorry, game over! Please try again.</div>
     <button class="gameover-button" id="gameOverRestart">Start Again</button>
   </div>
 </div>
@@ -490,6 +551,7 @@
   const livesDisplayEl = document.getElementById('livesDisplay');
   const gameOverOverlayEl = document.getElementById('gameOverOverlay');
   const gameOverRestartEl = document.getElementById('gameOverRestart');
+  const toastEl = document.getElementById('toast');
 
   function renderLives() {
     livesDisplayEl.innerHTML = '';
@@ -501,17 +563,36 @@
     }
   }
 
+  let toastTimeout;
+  function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 1800);
+  }
+
   function triggerWrongFeedback(card) {
     card.classList.remove('wrong');
     void card.offsetWidth;
     card.classList.add('wrong');
+    clearTimeout(card._wrongTimeout);
+    card._wrongTimeout = setTimeout(() => {
+      card.classList.remove('wrong');
+    }, 900);
   }
 
   function loseLife() {
     lives--;
     renderLives();
     if (lives <= 0) {
-      gameOverOverlayEl.classList.add('open');
+      showToast('Sorry, game over! Please try again.');
+      setTimeout(() => {
+        gameOverOverlayEl.classList.add('open');
+      }, 500);
+    } else {
+      showToast('Incorrect, try again!');
     }
   }
 
@@ -557,6 +638,8 @@
   }
 
   function dealCards() {
+    if (deckEl.dataset.empty === 'true') return;
+    tableEl.innerHTML = '';
     const numbers = orderedNumbers(CARD_COUNT);
     buildCardContent(numbers);
 
@@ -577,6 +660,7 @@
             <div class="hint">${content.hint}</div>
           </div>
         </div>
+        <div class="wrong-mark">&#10005;</div>
       `;
 
       card.addEventListener('click', () => {
