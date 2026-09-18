@@ -1,4 +1,4 @@
-const CACHE_NAME = 'escape-room-v6';
+const CACHE_NAME = 'escape-room-v7';
 const ASSETS = [
   './',
   './index.html',

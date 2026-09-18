@@ -443,7 +443,7 @@
 
   .zoom-card.has-puzzle {
     aspect-ratio: unset;
-    width: min(90vw, 380px);
+    width: min(92vw, 420px);
   }
 
   .zoom-number {
@@ -530,64 +530,99 @@
     align-items: center;
   }
 
-  .puzzle-cipher {
-    font-family: 'Courier New', monospace;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: #d8f5e6;
-    background: rgba(0, 0, 0, 0.25);
-    border-radius: 8px;
-    padding: 14px 12px;
-    word-break: break-word;
-    width: 100%;
-  }
-
   .puzzle-instructions {
     font-size: 12px;
     color: #9fd6b8;
     line-height: 1.4;
   }
 
-  .puzzle-input-row {
+  .cipher-grid {
     display: flex;
-    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px 5px;
     width: 100%;
-    max-width: 220px;
   }
 
-  .puzzle-input {
-    flex: 1;
-    min-width: 0;
-    border-radius: 8px;
-    border: 2px solid #4caf7d;
-    background: rgba(0, 0, 0, 0.2);
-    color: #d8f5e6;
-    font-size: 16px;
-    padding: 8px 10px;
-    text-align: center;
-    font-family: inherit;
+  .cipher-gap {
+    width: 12px;
   }
 
-  .puzzle-input:focus {
-    outline: none;
-    border-color: #7ee6a8;
+  .cipher-letter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
   }
 
-  .puzzle-submit {
-    border: none;
-    border-radius: 8px;
-    background: #4caf7d;
-    color: #123322;
+  .cipher-cipherchar {
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
     font-weight: 700;
+    color: #9fd6b8;
+    opacity: 0.8;
+  }
+
+  .cipher-blank {
+    width: 26px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 2px solid #4caf7d;
+    font-size: 16px;
+    font-weight: 700;
+    color: #d8f5e6;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .cipher-blank.active {
+    background: rgba(76, 175, 125, 0.25);
+  }
+
+  .cipher-blank.correct {
+    color: #7ee6a8;
+    border-bottom-color: #7ee6a8;
+  }
+
+  .cipher-blank.wrong {
+    color: #ff9a9a;
+    border-bottom-color: #ff9a9a;
+  }
+
+  .cipher-keyboard {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .cipher-key {
+    width: 30px;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #d8f5e6;
     font-size: 14px;
-    padding: 8px 16px;
+    font-weight: 700;
     cursor: pointer;
     font-family: inherit;
   }
 
-  .puzzle-submit:hover {
-    background: #5fc492;
+  .cipher-key:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .cipher-key-back {
+    background: rgba(224, 82, 82, 0.3);
+    width: 44px;
+  }
+
+  .cipher-key-back:hover {
+    background: rgba(224, 82, 82, 0.45);
   }
 
   .puzzle-feedback {
@@ -889,12 +924,9 @@
     <div class="zoom-message" id="zoomMessage"></div>
     <div class="zoom-hint" id="zoomHint"></div>
     <div class="zoom-puzzle" id="zoomPuzzle" hidden>
-      <div class="puzzle-cipher" id="puzzleCipher"></div>
+      <div class="cipher-grid" id="cipherGrid"></div>
       <div class="puzzle-instructions" id="puzzleInstructions"></div>
-      <div class="puzzle-input-row">
-        <input type="text" inputmode="numeric" class="puzzle-input" id="puzzleInput" placeholder="Card #">
-        <button class="puzzle-submit" id="puzzleSubmit">Submit</button>
-      </div>
+      <div class="cipher-keyboard" id="cipherKeyboard"></div>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
       <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
@@ -1032,15 +1064,48 @@
     'NINETEEN', 'TWENTY',
   ];
 
+  const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const EXTRA_KEYBOARD_LETTERS = 8;
+
+  const CIPHER_TEMPLATES = [
+    (w) => 'FLIP CARD ' + w,
+    (w) => 'YOUR NEXT CLUE IS CARD ' + w,
+    (w) => 'SEEK OUT CARD ' + w,
+    (w) => 'THE ANSWER LIES AT CARD ' + w,
+    (w) => 'TURN OVER CARD ' + w + ' NEXT',
+    (w) => 'CARD ' + w + ' HOLDS THE TRUTH',
+    (w) => 'PROCEED TO CARD ' + w,
+    (w) => 'THE TRAIL LEADS TO CARD ' + w,
+    (w) => 'GO FIND CARD ' + w,
+    (w) => 'CARD ' + w + ' IS YOUR TARGET',
+    (w) => 'REVEAL WHAT CARD ' + w + ' HIDES',
+    (w) => 'CARD ' + w + ' AWAITS YOU',
+  ];
+
   function makeCipherPuzzle(target) {
     const shift = 1 + Math.floor(Math.random() * 5);
-    const phrase = 'FLIP CARD ' + NUMBER_WORDS[target];
+    const template = CIPHER_TEMPLATES[Math.floor(Math.random() * CIPHER_TEMPLATES.length)];
+    const phrase = template(NUMBER_WORDS[target]);
     const ciphertext = phrase.split('').map((ch) => {
       if (ch === ' ') return ' ';
       const code = ch.charCodeAt(0) - 65;
       return String.fromCharCode(((code + shift) % 26) + 65);
     }).join('');
-    return { ciphertext, shift, answer: target, solved: false, reveal: phrase + ' (' + target + ')' };
+
+    const needed = new Set(phrase.replace(/[^A-Z]/g, '').split(''));
+    const extra = shuffle(ALPHABET.filter((l) => !needed.has(l))).slice(0, EXTRA_KEYBOARD_LETTERS);
+    const keyboard = [...needed, ...extra].sort();
+
+    return {
+      ciphertext,
+      plaintext: phrase,
+      shift,
+      answer: target,
+      solved: false,
+      guesses: new Array(ciphertext.length).fill(null),
+      keyboard,
+      reveal: phrase + ' (' + target + ')',
+    };
   }
 
   function mediumHintText(target) {
@@ -1124,10 +1189,9 @@
   const zoomHintEl = document.getElementById('zoomHint');
   const zoomCloseEl = document.getElementById('zoomClose');
   const zoomPuzzleEl = document.getElementById('zoomPuzzle');
-  const puzzleCipherEl = document.getElementById('puzzleCipher');
+  const cipherGridEl = document.getElementById('cipherGrid');
+  const cipherKeyboardEl = document.getElementById('cipherKeyboard');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
-  const puzzleInputEl = document.getElementById('puzzleInput');
-  const puzzleSubmitEl = document.getElementById('puzzleSubmit');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleAgainEl = document.getElementById('puzzleAgain');
   const puzzleRevealToggleEl = document.getElementById('puzzleRevealToggle');
@@ -1517,11 +1581,9 @@
     opts = opts || {};
     const isTest = !!opts.isTest;
     const p = content.puzzle;
-    puzzleCipherEl.textContent = p.ciphertext;
+
     puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
-      ' in the alphabet. Decode the message to reveal the hidden number.';
-    puzzleInputEl.value = '';
-    puzzleInputEl.placeholder = isTest ? 'Number' : 'Card #';
+      ' in the alphabet. Tap a blank, then tap a letter to fill it in.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -1536,35 +1598,130 @@
       puzzleRevealEl.textContent = 'Decoded: ' + p.reveal;
     };
 
-    const submit = () => {
-      const guess = parseInt(puzzleInputEl.value, 10);
-      if (guess === p.answer) {
-        p.solved = true;
-        puzzleFeedbackEl.className = 'puzzle-feedback correct';
-        if (isTest) {
-          puzzleFeedbackEl.textContent = '✓ Correct! The number was ' + p.answer + '.';
-          puzzleAgainEl.hidden = false;
-        } else {
-          puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
-          const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-          if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-          setTimeout(() => {
-            zoomCardEl.classList.remove('has-puzzle');
-            zoomHintEl.hidden = false;
-            zoomPuzzleEl.hidden = true;
-            zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
-          }, 900);
+    let activeIndex = -1;
+    for (let i = 0; i < p.ciphertext.length; i++) {
+      if (p.ciphertext[i] !== ' ' && !p.guesses[i]) {
+        activeIndex = i;
+        break;
+      }
+    }
+
+    function advanceActive() {
+      for (let i = activeIndex + 1; i < p.ciphertext.length; i++) {
+        if (p.ciphertext[i] !== ' ' && !p.guesses[i]) {
+          activeIndex = i;
+          return;
         }
+      }
+      for (let i = 0; i < p.ciphertext.length; i++) {
+        if (p.ciphertext[i] !== ' ' && !p.guesses[i]) {
+          activeIndex = i;
+          return;
+        }
+      }
+      activeIndex = -1;
+    }
+
+    function solvePuzzle() {
+      p.solved = true;
+      puzzleFeedbackEl.className = 'puzzle-feedback correct';
+      if (isTest) {
+        puzzleFeedbackEl.textContent = '✓ Solved! ' + p.plaintext + ' (' + p.answer + ')';
+        puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = 'Not quite — try again!';
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      }
+    }
+
+    function checkComplete() {
+      const allFilled = p.guesses.every((g, i) => p.ciphertext[i] === ' ' || g);
+      if (!allFilled) return;
+      const allCorrect = p.guesses.every((g, i) => p.ciphertext[i] === ' ' || g === p.plaintext[i]);
+      if (allCorrect) {
+        solvePuzzle();
+      } else {
+        puzzleFeedbackEl.textContent = 'Close! Fix the red letters.';
         puzzleFeedbackEl.className = 'puzzle-feedback wrong';
       }
-    };
+    }
 
-    puzzleSubmitEl.onclick = submit;
-    puzzleInputEl.onkeydown = (e) => {
-      if (e.key === 'Enter') submit();
-    };
+    function renderGrid() {
+      cipherGridEl.innerHTML = '';
+      p.ciphertext.split('').forEach((ch, i) => {
+        if (ch === ' ') {
+          const gap = document.createElement('div');
+          gap.className = 'cipher-gap';
+          cipherGridEl.appendChild(gap);
+          return;
+        }
+        const guess = p.guesses[i];
+        const isCorrect = guess && guess === p.plaintext[i];
+        const isWrong = guess && guess !== p.plaintext[i];
+
+        const unit = document.createElement('div');
+        unit.className = 'cipher-letter';
+        unit.innerHTML = `
+          <div class="cipher-cipherchar">${ch}</div>
+          <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}">${guess || '_'}</div>
+        `;
+        unit.querySelector('.cipher-blank').addEventListener('click', () => {
+          activeIndex = i;
+          renderGrid();
+        });
+        cipherGridEl.appendChild(unit);
+      });
+    }
+
+    function renderKeyboard() {
+      cipherKeyboardEl.innerHTML = '';
+      p.keyboard.forEach((letter) => {
+        const key = document.createElement('button');
+        key.className = 'cipher-key';
+        key.textContent = letter;
+        key.addEventListener('click', () => {
+          if (activeIndex === -1 || p.solved) return;
+          p.guesses[activeIndex] = letter;
+          advanceActive();
+          renderGrid();
+          checkComplete();
+        });
+        cipherKeyboardEl.appendChild(key);
+      });
+      const back = document.createElement('button');
+      back.className = 'cipher-key cipher-key-back';
+      back.textContent = '⌫';
+      back.addEventListener('click', () => {
+        if (p.solved) return;
+        if (activeIndex !== -1 && p.guesses[activeIndex]) {
+          p.guesses[activeIndex] = null;
+        } else {
+          const from = activeIndex === -1 ? p.ciphertext.length : activeIndex;
+          for (let i = from - 1; i >= 0; i--) {
+            if (p.ciphertext[i] !== ' ') {
+              activeIndex = i;
+              p.guesses[i] = null;
+              break;
+            }
+          }
+        }
+        renderGrid();
+        puzzleFeedbackEl.textContent = '';
+        puzzleFeedbackEl.className = 'puzzle-feedback';
+      });
+      cipherKeyboardEl.appendChild(back);
+    }
+
+    renderGrid();
+    renderKeyboard();
+
     puzzleAgainEl.onclick = () => {
       if (opts.onRetry) opts.onRetry();
     };
