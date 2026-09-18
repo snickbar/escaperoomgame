@@ -194,6 +194,19 @@
     color: #d6b89f;
   }
 
+  .card-front.win {
+    background: linear-gradient(135deg, #6a3f8f, #2f1c4f);
+    border-color: #b98cf0;
+  }
+
+  .card-front.win .message {
+    color: #f0e6f9;
+  }
+
+  .card-front.win .hint {
+    color: #d6b9f0;
+  }
+
   .hint {
     color: #7a8194;
     font-size: 13px;
@@ -279,6 +292,23 @@
     color: #d6b89f;
   }
 
+  .zoom-card.win {
+    background: linear-gradient(135deg, #6a3f8f, #2f1c4f);
+    border-color: #b98cf0;
+  }
+
+  .zoom-card.win .zoom-number {
+    color: #d6b9f0;
+  }
+
+  .zoom-card.win .zoom-message {
+    color: #f0e6f9;
+  }
+
+  .zoom-card.win .zoom-hint {
+    color: #d6b9f0;
+  }
+
   .zoom-close {
     position: absolute;
     top: 12px;
@@ -349,24 +379,37 @@
 
   const cardContent = new Map();
 
-  function buildCardContent(numbers) {
-    const otherNumbers = numbers.filter((n) => n !== STORY_NUMBER);
-    const targetNumber = otherNumbers[Math.floor(Math.random() * otherNumbers.length)];
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
 
-    numbers.forEach((num) => {
-      if (num === STORY_NUMBER) {
-        cardContent.set(num, {
-          isStory: true,
-          message: 'Help Lucy find her lost dog!',
-          hint: 'Flip over card ' + targetNumber + '!',
-        });
+  function buildCardContent(numbers) {
+    const rest = shuffle(numbers.filter((n) => n !== STORY_NUMBER));
+    const chain = [STORY_NUMBER, ...rest];
+
+    chain.forEach((num, i) => {
+      const isStory = i === 0;
+      const isWin = i === chain.length - 1;
+      let message;
+      let hint;
+
+      if (isStory) {
+        message = 'Help Lucy find her lost dog!';
+        hint = 'Flip over card ' + chain[i + 1] + '!';
+      } else if (isWin) {
+        message = '\u{1F389} You escaped!';
+        hint = 'The End';
       } else {
-        cardContent.set(num, {
-          isStory: false,
-          message: '✓ Success!',
-          hint: '(placeholder for card ' + num + ')',
-        });
+        message = '✓ Nicely done!';
+        hint = 'Flip over card ' + chain[i + 1] + '!';
       }
+
+      cardContent.set(num, { isStory, isWin, message, hint });
     });
   }
 
@@ -386,7 +429,7 @@
           <div class="card-face card-back">
             <div class="card-number">${num}</div>
           </div>
-          <div class="card-face card-front${content.isStory ? ' story' : ''}">
+          <div class="card-face card-front${content.isStory ? ' story' : content.isWin ? ' win' : ''}">
             <div class="message">${content.message}</div>
             <div class="hint">${content.hint}</div>
           </div>
@@ -425,6 +468,7 @@
   function openZoom(num) {
     const content = cardContent.get(num);
     zoomCardEl.classList.toggle('story', content.isStory);
+    zoomCardEl.classList.toggle('win', content.isWin);
     zoomNumberEl.textContent = 'Card ' + num;
     zoomMessageEl.textContent = content.message;
     zoomHintEl.textContent = content.hint;
