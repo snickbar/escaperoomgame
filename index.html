@@ -2,8 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Escape Room Card Game</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#14161c">
+
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Escape Room">
+
 <style>
   :root {
     color-scheme: dark;
@@ -19,7 +30,7 @@
     background: #14161c;
     font-family: system-ui, -apple-system, sans-serif;
     color: #cfd3dc;
-    padding: 24px 16px 60px;
+    padding: calc(24px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
   }
 
   h1 {
@@ -724,6 +735,12 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeZoom();
   });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
 </script>
 
 </body>
