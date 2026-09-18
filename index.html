@@ -540,12 +540,14 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: 8px 5px;
+    gap: 8px 14px;
     width: 100%;
   }
 
-  .cipher-gap {
-    width: 12px;
+  .cipher-word {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
   }
 
   .cipher-letter {
@@ -1583,7 +1585,7 @@
     const p = content.puzzle;
 
     puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
-      ' in the alphabet. Tap a blank, then tap a letter to fill it in.';
+      ' in the alphabet. Tap a blank, then tap a letter — matching letters fill in too.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -1653,14 +1655,32 @@
       }
     }
 
+    function applyGuess(index, letter) {
+      const ch = p.ciphertext[index];
+      for (let i = 0; i < p.ciphertext.length; i++) {
+        if (p.ciphertext[i] === ch) p.guesses[i] = letter;
+      }
+    }
+
+    function clearGuess(index) {
+      const ch = p.ciphertext[index];
+      for (let i = 0; i < p.ciphertext.length; i++) {
+        if (p.ciphertext[i] === ch) p.guesses[i] = null;
+      }
+    }
+
     function renderGrid() {
       cipherGridEl.innerHTML = '';
+      let wordEl = null;
       p.ciphertext.split('').forEach((ch, i) => {
         if (ch === ' ') {
-          const gap = document.createElement('div');
-          gap.className = 'cipher-gap';
-          cipherGridEl.appendChild(gap);
+          wordEl = null;
           return;
+        }
+        if (!wordEl) {
+          wordEl = document.createElement('div');
+          wordEl.className = 'cipher-word';
+          cipherGridEl.appendChild(wordEl);
         }
         const guess = p.guesses[i];
         const isCorrect = guess && guess === p.plaintext[i];
@@ -1676,7 +1696,7 @@
           activeIndex = i;
           renderGrid();
         });
-        cipherGridEl.appendChild(unit);
+        wordEl.appendChild(unit);
       });
     }
 
@@ -1688,7 +1708,7 @@
         key.textContent = letter;
         key.addEventListener('click', () => {
           if (activeIndex === -1 || p.solved) return;
-          p.guesses[activeIndex] = letter;
+          applyGuess(activeIndex, letter);
           advanceActive();
           renderGrid();
           checkComplete();
@@ -1701,13 +1721,13 @@
       back.addEventListener('click', () => {
         if (p.solved) return;
         if (activeIndex !== -1 && p.guesses[activeIndex]) {
-          p.guesses[activeIndex] = null;
+          clearGuess(activeIndex);
         } else {
           const from = activeIndex === -1 ? p.ciphertext.length : activeIndex;
           for (let i = from - 1; i >= 0; i--) {
             if (p.ciphertext[i] !== ' ') {
               activeIndex = i;
-              p.guesses[i] = null;
+              clearGuess(i);
               break;
             }
           }
