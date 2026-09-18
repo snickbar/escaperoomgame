@@ -441,6 +441,11 @@
     transform: scale(1) translateY(0);
   }
 
+  .zoom-card.has-puzzle {
+    aspect-ratio: unset;
+    width: min(90vw, 380px);
+  }
+
   .zoom-number {
     font-size: 15px;
     letter-spacing: 0.05em;
@@ -513,6 +518,90 @@
 
   .zoom-close:hover {
     background: rgba(0, 0, 0, 0.5);
+  }
+
+  /* --- Cipher puzzle --- */
+
+  .zoom-puzzle {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .puzzle-cipher {
+    font-family: 'Courier New', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #d8f5e6;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 8px;
+    padding: 14px 12px;
+    word-break: break-word;
+    width: 100%;
+  }
+
+  .puzzle-instructions {
+    font-size: 12px;
+    color: #9fd6b8;
+    line-height: 1.4;
+  }
+
+  .puzzle-input-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 220px;
+  }
+
+  .puzzle-input {
+    flex: 1;
+    min-width: 0;
+    border-radius: 8px;
+    border: 2px solid #4caf7d;
+    background: rgba(0, 0, 0, 0.2);
+    color: #d8f5e6;
+    font-size: 16px;
+    padding: 8px 10px;
+    text-align: center;
+    font-family: inherit;
+  }
+
+  .puzzle-input:focus {
+    outline: none;
+    border-color: #7ee6a8;
+  }
+
+  .puzzle-submit {
+    border: none;
+    border-radius: 8px;
+    background: #4caf7d;
+    color: #123322;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .puzzle-submit:hover {
+    background: #5fc492;
+  }
+
+  .puzzle-feedback {
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 18px;
+  }
+
+  .puzzle-feedback.correct {
+    color: #7ee6a8;
+  }
+
+  .puzzle-feedback.wrong {
+    color: #ff9a9a;
   }
 
   /* --- Game over overlay --- */
@@ -752,6 +841,15 @@
     <div class="zoom-number" id="zoomNumber"></div>
     <div class="zoom-message" id="zoomMessage"></div>
     <div class="zoom-hint" id="zoomHint"></div>
+    <div class="zoom-puzzle" id="zoomPuzzle" hidden>
+      <div class="puzzle-cipher" id="puzzleCipher"></div>
+      <div class="puzzle-instructions" id="puzzleInstructions"></div>
+      <div class="puzzle-input-row">
+        <input type="text" inputmode="numeric" class="puzzle-input" id="puzzleInput" placeholder="Card #">
+        <button class="puzzle-submit" id="puzzleSubmit">Submit</button>
+      </div>
+      <div class="puzzle-feedback" id="puzzleFeedback"></div>
+    </div>
   </div>
 </div>
 
@@ -868,6 +966,23 @@
     } catch (e) {}
   }
 
+  const NUMBER_WORDS = [
+    'ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN',
+    'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN',
+    'NINETEEN', 'TWENTY',
+  ];
+
+  function makeCipherPuzzle(target) {
+    const shift = 1 + Math.floor(Math.random() * 5);
+    const phrase = 'FLIP CARD ' + NUMBER_WORDS[target];
+    const ciphertext = phrase.split('').map((ch) => {
+      if (ch === ' ') return ' ';
+      const code = ch.charCodeAt(0) - 65;
+      return String.fromCharCode(((code + shift) % 26) + 65);
+    }).join('');
+    return { ciphertext, shift, answer: target, solved: false };
+  }
+
   function mediumHintText(target) {
     const useSubtraction = Math.random() < 0.4;
     if (useSubtraction) {
@@ -944,6 +1059,12 @@
   const zoomMessageEl = document.getElementById('zoomMessage');
   const zoomHintEl = document.getElementById('zoomHint');
   const zoomCloseEl = document.getElementById('zoomClose');
+  const zoomPuzzleEl = document.getElementById('zoomPuzzle');
+  const puzzleCipherEl = document.getElementById('puzzleCipher');
+  const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
+  const puzzleInputEl = document.getElementById('puzzleInput');
+  const puzzleSubmitEl = document.getElementById('puzzleSubmit');
+  const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
 
   // --- State ---
 
@@ -1059,7 +1180,7 @@
   function trapContent() {
     return {
       isStory: false, isWin: false, isSeed: false,
-      next: null, message: '', hint: '', backItem: null,
+      next: null, message: '', hint: '', backItem: null, puzzle: null,
     };
   }
 
@@ -1081,10 +1202,12 @@
       const next = isWin ? null : chain[i + 1];
 
       let hint;
+      let puzzle = null;
       if (isWin) {
         hint = 'The End';
       } else if (mode === 'easy') {
-        hint = 'Flip over card ' + next + '!';
+        puzzle = makeCipherPuzzle(next);
+        hint = '\u{1F510} Solve the cipher to find your next card!';
       } else {
         hint = mediumHintText(next);
       }
@@ -1098,7 +1221,7 @@
         message = '✓ Nicely done!';
       }
 
-      cardContent.set(num, { isStory, isWin, isSeed: isStory, next, message, hint, backItem: null });
+      cardContent.set(num, { isStory, isWin, isSeed: isStory, next, message, hint, backItem: null, puzzle });
     });
 
     numbers.forEach((num) => {
@@ -1143,7 +1266,7 @@
         message = '✓ Item found!';
       }
 
-      cardContent.set(num, { isStory, isWin, isSeed, next, message, hint, backItem: itemForNumber[num] });
+      cardContent.set(num, { isStory, isWin, isSeed, next, message, hint, backItem: itemForNumber[num], puzzle: null });
     });
 
     numbers.forEach((num) => {
@@ -1268,8 +1391,54 @@
     zoomNumberEl.textContent = 'Card ' + num +
       (content.backItem ? ' — ' + content.backItem.emoji + ' ' + content.backItem.name : '');
     zoomMessageEl.textContent = content.message;
-    zoomHintEl.textContent = content.hint;
+
+    const showPuzzle = content.puzzle && !content.puzzle.solved;
+    zoomCardEl.classList.toggle('has-puzzle', showPuzzle);
+    zoomHintEl.hidden = showPuzzle;
+    zoomPuzzleEl.hidden = !showPuzzle;
+
+    if (showPuzzle) {
+      renderPuzzle(content, num);
+    } else {
+      zoomHintEl.textContent = content.puzzle ? ('Flip over card ' + content.puzzle.answer + '!') : content.hint;
+    }
+
     zoomOverlay.classList.add('open');
+  }
+
+  function renderPuzzle(content, num) {
+    const p = content.puzzle;
+    puzzleCipherEl.textContent = p.ciphertext;
+    puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
+      ' in the alphabet. Decode the message to find your next card number.';
+    puzzleInputEl.value = '';
+    puzzleFeedbackEl.textContent = '';
+    puzzleFeedbackEl.className = 'puzzle-feedback';
+
+    const submit = () => {
+      const guess = parseInt(puzzleInputEl.value, 10);
+      if (guess === p.answer) {
+        p.solved = true;
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.className = 'puzzle-feedback correct';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      } else {
+        puzzleFeedbackEl.textContent = 'Not quite — try again!';
+        puzzleFeedbackEl.className = 'puzzle-feedback wrong';
+      }
+    };
+
+    puzzleSubmitEl.onclick = submit;
+    puzzleInputEl.onkeydown = (e) => {
+      if (e.key === 'Enter') submit();
+    };
   }
 
   function closeZoom() {
