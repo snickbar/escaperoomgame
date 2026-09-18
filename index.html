@@ -41,6 +41,93 @@
     margin: 0 0 12px;
   }
 
+  [hidden] {
+    display: none !important;
+  }
+
+  /* --- Home screen --- */
+
+  .home-subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #7a8194;
+    margin: 0 0 28px;
+  }
+
+  .deck-grid {
+    max-width: 440px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .deck-tile {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 14px;
+    border: 2px solid #3d4250;
+    background: linear-gradient(135deg, #22252e, #1a1c22);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    width: 100%;
+  }
+
+  .deck-tile:hover {
+    filter: brightness(1.08);
+  }
+
+  .deck-icon {
+    font-size: 32px;
+    flex-shrink: 0;
+  }
+
+  .deck-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .deck-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #e4e7ee;
+  }
+
+  .deck-tagline {
+    font-size: 12px;
+    color: #9aa0ad;
+    margin-top: 2px;
+  }
+
+  .deck-badge {
+    font-size: 11px;
+    color: #7ee6a8;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  /* --- Game screen --- */
+
+  .home-link {
+    display: block;
+    margin: 0 auto 16px;
+    background: none;
+    border: none;
+    color: #9aa0ad;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 10px;
+  }
+
+  .home-link:hover {
+    color: #cfd3dc;
+  }
+
   .lives {
     text-align: center;
     font-size: 26px;
@@ -228,12 +315,25 @@
   .card-back {
     background: linear-gradient(135deg, #2b2f3a, #1a1c22);
     border: 2px solid #3d4250;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .card-back .card-number {
     font-size: 40px;
     font-weight: 700;
     color: #6c7a96;
+  }
+
+  .card-back .item-icon {
+    font-size: 38px;
+    line-height: 1;
+  }
+
+  .card-back .item-name {
+    font-size: 11px;
+    color: #8b93a5;
+    font-weight: 600;
   }
 
   .card-front {
@@ -470,6 +570,111 @@
     background: #ea6868;
   }
 
+  /* --- Win overlay --- */
+
+  .win-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 9, 12, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    padding: 16px;
+  }
+
+  .win-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .win-card {
+    width: min(90vw, 380px);
+    background: linear-gradient(135deg, #6a3f8f, #2f1c4f);
+    border: 2px solid #b98cf0;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    padding: 32px 28px;
+    text-align: center;
+    transform: scale(0.85);
+    transition: transform 0.3s ease;
+  }
+
+  .win-overlay.open .win-card {
+    transform: scale(1);
+  }
+
+  .win-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #f0e6f9;
+    margin-bottom: 18px;
+  }
+
+  .win-stats {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+
+  .win-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: #e5d6f5;
+    padding: 4px 0;
+  }
+
+  .win-stat-label {
+    color: #c9a9ec;
+  }
+
+  .win-newbest {
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffd76a;
+    margin-bottom: 18px;
+  }
+
+  .win-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+  }
+
+  .win-btn {
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px 24px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .win-btn-primary {
+    background: #b98cf0;
+    color: #2f1c4f;
+  }
+
+  .win-btn-primary:hover {
+    background: #c9a3f5;
+  }
+
+  .win-btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f0e6f9;
+  }
+
+  .win-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
   /* --- Toast --- */
 
   .toast {
@@ -499,27 +704,36 @@
 </head>
 <body>
 
-<h1>Escape Room Card Game</h1>
+<div id="homeScreen">
+  <h1>Escape Room Card Game</h1>
+  <p class="home-subtitle">Choose a deck to play</p>
+  <div class="deck-grid" id="deckGrid"></div>
+</div>
 
-<div class="lives" id="livesDisplay"></div>
+<div id="gameScreen" hidden>
+  <button class="home-link" id="homeLink">&larr; Back to decks</button>
+  <h1 id="gameTitle">Escape Room Card Game</h1>
 
-<div class="toast" id="toast"></div>
+  <div class="lives" id="livesDisplay"></div>
 
-<div class="scene">
-  <div class="deck-wrap" id="deckWrap">
-    <div class="deck" id="deck">
-      <div class="deck-card" style="transform: translate(3px, 3px) rotate(-2deg);"></div>
-      <div class="deck-card" style="transform: translate(-2px, 1px) rotate(1.5deg);"></div>
-      <div class="deck-card" style="transform: translate(1px, -2px) rotate(-1deg);"></div>
-      <div class="deck-card"></div>
+  <div class="toast" id="toast"></div>
+
+  <div class="scene">
+    <div class="deck-wrap" id="deckWrap">
+      <div class="deck" id="deck">
+        <div class="deck-card" style="transform: translate(3px, 3px) rotate(-2deg);"></div>
+        <div class="deck-card" style="transform: translate(-2px, 1px) rotate(1.5deg);"></div>
+        <div class="deck-card" style="transform: translate(1px, -2px) rotate(-1deg);"></div>
+        <div class="deck-card"></div>
+      </div>
+      <div class="deck-caption">
+        <strong id="deckCount">12</strong> cards in deck<br>
+        <span id="deckHint">Click the deck to deal</span>
+      </div>
     </div>
-    <div class="deck-caption">
-      <strong id="deckCount">12</strong> cards in deck<br>
-      <span id="deckHint">Click the deck to deal</span>
-    </div>
+
+    <div class="table" id="table"></div>
   </div>
-
-  <div class="table" id="table"></div>
 </div>
 
 <div class="zoom-overlay" id="zoomOverlay">
@@ -539,14 +753,146 @@
   </div>
 </div>
 
+<div class="win-overlay" id="winOverlay">
+  <div class="win-card">
+    <div class="win-title">&#127881; Congratulations!</div>
+    <div class="win-stats">
+      <div class="win-stat"><span class="win-stat-label">Time</span><span id="winTime"></span></div>
+      <div class="win-stat"><span class="win-stat-label">Mistakes</span><span id="winMistakes"></span></div>
+    </div>
+    <div class="win-newbest" id="winNewBest" hidden>&#9733; New best time!</div>
+    <div class="win-buttons">
+      <button class="win-btn win-btn-secondary" id="winPlayAgain">Play Again</button>
+      <button class="win-btn win-btn-primary" id="winHome">Back to Home</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const CARD_COUNT = 12;
+  const STORY_NUMBER = 1;
+  const MAX_LIVES = 3;
+  const PROGRESS_KEY = 'escapeRoomProgress';
+
+  const DECKS = {
+    easy: {
+      id: 'easy',
+      label: 'Easy',
+      icon: '\u{1F4D6}',
+      tagline: 'Follow the story clues',
+      accent: '#4caf7d',
+      story: 'Help Lucy find her lost dog!',
+    },
+    medium: {
+      id: 'medium',
+      label: 'Medium',
+      icon: '➕',
+      tagline: 'Solve the math to find your way',
+      accent: '#4c9df0',
+      story: 'Solve each puzzle to find your way!',
+    },
+    hard: {
+      id: 'hard',
+      label: 'Hard',
+      icon: '\u{1F9E9}',
+      tagline: 'Combine items to craft your escape',
+      accent: '#e05252',
+      story: 'Combine items to craft your escape!',
+    },
+  };
+
+  const ITEMS = [
+    { id: 0, emoji: '\u{1F511}', name: 'Key' },
+    { id: 1, emoji: '\u{1F512}', name: 'Lock' },
+    { id: 2, emoji: '\u{1F56F}️', name: 'Candle' },
+    { id: 3, emoji: '\u{1F525}', name: 'Match' },
+    { id: 4, emoji: '\u{1F50C}', name: 'Plug' },
+    { id: 5, emoji: '\u{1F4A1}', name: 'Lamp' },
+    { id: 6, emoji: '\u{1F5FA}️', name: 'Map' },
+    { id: 7, emoji: '\u{1F9ED}', name: 'Compass' },
+    { id: 8, emoji: '\u{1F4DC}', name: 'Scroll' },
+    { id: 9, emoji: '\u{1F58B}️', name: 'Quill' },
+    { id: 10, emoji: '\u{1F48E}', name: 'Gem' },
+    { id: 11, emoji: '\u{1F451}', name: 'Crown' },
+  ];
+
+  const RECIPES = {
+    0: [4, 7],
+    1: [0, 9],
+    2: [3, 10],
+    3: [2, 5],
+    4: [5, 8],
+    5: [4, 3],
+    6: [7, 9],
+    7: [6, 11],
+    8: [9, 1],
+    9: [8, 10],
+    10: [11, 2],
+    11: [10, 6],
+  };
 
   function orderedNumbers(count) {
     return Array.from({ length: count }, (_, i) => i + 1);
   }
 
-  const STORY_NUMBER = 1;
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function formatTime(ms) {
+    const totalSeconds = Math.max(0, Math.round(ms / 1000));
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function loadProgress() {
+    try {
+      return JSON.parse(localStorage.getItem(PROGRESS_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveProgress(progress) {
+    try {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+    } catch (e) {}
+  }
+
+  function mediumHintText(target) {
+    const useSubtraction = Math.random() < 0.4;
+    if (useSubtraction) {
+      const b = 1 + Math.floor(Math.random() * 5);
+      const a = target + b;
+      return 'What is ' + a + ' - ' + b + '?';
+    }
+    const a = target <= 1 ? 0 : 1 + Math.floor(Math.random() * (target - 1));
+    const b = target - a;
+    return 'What is ' + a + ' + ' + b + '?';
+  }
+
+  function hardHintText(target, itemForNumber) {
+    const targetItem = itemForNumber[target];
+    const [aId, bId] = RECIPES[targetItem.id];
+    const a = ITEMS[aId];
+    const b = ITEMS[bId];
+    return 'Combine ' + a.emoji + ' ' + a.name + ' and ' + b.emoji + ' ' + b.name +
+      ' to reveal the ' + targetItem.emoji + ' ' + targetItem.name + '!';
+  }
+
+  // --- Element refs ---
+
+  const homeScreenEl = document.getElementById('homeScreen');
+  const deckGridEl = document.getElementById('deckGrid');
+  const gameScreenEl = document.getElementById('gameScreen');
+  const gameTitleEl = document.getElementById('gameTitle');
+  const homeLinkEl = document.getElementById('homeLink');
 
   const deckEl = document.getElementById('deck');
   const deckWrapEl = document.getElementById('deckWrap');
@@ -554,15 +900,85 @@
   const deckCountEl = document.getElementById('deckCount');
   const deckHintEl = document.getElementById('deckHint');
 
-  const cardContent = new Map();
-  const MAX_LIVES = 3;
-  let lives = MAX_LIVES;
-  let currentTarget = null;
-
   const livesDisplayEl = document.getElementById('livesDisplay');
+  const toastEl = document.getElementById('toast');
+
   const gameOverOverlayEl = document.getElementById('gameOverOverlay');
   const gameOverRestartEl = document.getElementById('gameOverRestart');
-  const toastEl = document.getElementById('toast');
+
+  const winOverlayEl = document.getElementById('winOverlay');
+  const winTimeEl = document.getElementById('winTime');
+  const winMistakesEl = document.getElementById('winMistakes');
+  const winNewBestEl = document.getElementById('winNewBest');
+  const winPlayAgainEl = document.getElementById('winPlayAgain');
+  const winHomeEl = document.getElementById('winHome');
+
+  const zoomOverlay = document.getElementById('zoomOverlay');
+  const zoomCardEl = document.getElementById('zoomCard');
+  const zoomNumberEl = document.getElementById('zoomNumber');
+  const zoomMessageEl = document.getElementById('zoomMessage');
+  const zoomHintEl = document.getElementById('zoomHint');
+  const zoomCloseEl = document.getElementById('zoomClose');
+
+  // --- State ---
+
+  const cardContent = new Map();
+  let lives = MAX_LIVES;
+  let currentTarget = null;
+  let currentMode = null;
+  let startTime = 0;
+  let mistakes = 0;
+
+  // --- Home screen ---
+
+  function renderHome() {
+    const progress = loadProgress();
+    deckGridEl.innerHTML = '';
+    Object.values(DECKS).forEach((deck) => {
+      const p = progress[deck.id] || {};
+      const tile = document.createElement('button');
+      tile.className = 'deck-tile';
+      tile.style.borderColor = deck.accent;
+      tile.innerHTML = `
+        <div class="deck-icon">${deck.icon}</div>
+        <div class="deck-info">
+          <div class="deck-name">${deck.label}</div>
+          <div class="deck-tagline">${deck.tagline}</div>
+          ${p.completed ? `<div class="deck-badge">&#10003; Completed &middot; Best ${formatTime(p.bestTimeMs)}</div>` : ''}
+        </div>
+      `;
+      tile.addEventListener('click', () => startDeck(deck.id));
+      deckGridEl.appendChild(tile);
+    });
+  }
+
+  function goHome() {
+    gameScreenEl.hidden = true;
+    homeScreenEl.hidden = false;
+    renderHome();
+  }
+
+  function startDeck(modeId) {
+    currentMode = modeId;
+    gameTitleEl.textContent = DECKS[modeId].label + ' Deck';
+    tableEl.innerHTML = '';
+    winOverlayEl.classList.remove('open');
+    gameOverOverlayEl.classList.remove('open');
+    zoomOverlay.classList.remove('open');
+    deckWrapEl.classList.remove('gone');
+    deckWrapEl.style.display = '';
+    deckEl.dataset.empty = 'false';
+    deckCountEl.textContent = String(CARD_COUNT);
+    deckHintEl.textContent = 'Click the deck to deal';
+    lives = MAX_LIVES;
+    renderLives();
+    homeScreenEl.hidden = true;
+    gameScreenEl.hidden = false;
+  }
+
+  homeLinkEl.addEventListener('click', goHome);
+
+  // --- Lives / feedback ---
 
   function renderLives() {
     livesDisplayEl.innerHTML = '';
@@ -596,6 +1012,7 @@
 
   function loseLife() {
     lives--;
+    mistakes++;
     renderLives();
     if (lives <= 0) {
       showToast('Sorry, game over! Please try again.');
@@ -608,41 +1025,54 @@
   }
 
   gameOverRestartEl.addEventListener('click', () => {
-    location.reload();
+    gameOverOverlayEl.classList.remove('open');
+    performDeal();
   });
 
-  function shuffle(arr) {
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [a[i], a[j]] = [a[j], a[i]];
-    }
-    return a;
-  }
+  // --- Card content per mode ---
 
-  function buildCardContent(numbers) {
+  function buildCardContent(mode, numbers) {
     const rest = shuffle(numbers.filter((n) => n !== STORY_NUMBER));
     const chain = [STORY_NUMBER, ...rest];
+
+    let itemForNumber = null;
+    if (mode === 'hard') {
+      const shuffledItems = shuffle(ITEMS);
+      itemForNumber = {};
+      numbers.forEach((num, idx) => {
+        itemForNumber[num] = shuffledItems[idx];
+      });
+    }
 
     chain.forEach((num, i) => {
       const isStory = i === 0;
       const isWin = i === chain.length - 1;
       const next = isWin ? null : chain[i + 1];
-      let message;
-      let hint;
 
-      if (isStory) {
-        message = 'Help Lucy find her lost dog!';
-        hint = 'Flip over card ' + next + '!';
-      } else if (isWin) {
-        message = '\u{1F389} You escaped!';
+      let hint;
+      if (isWin) {
         hint = 'The End';
-      } else {
-        message = '✓ Nicely done!';
+      } else if (mode === 'easy') {
         hint = 'Flip over card ' + next + '!';
+      } else if (mode === 'medium') {
+        hint = mediumHintText(next);
+      } else {
+        hint = hardHintText(next, itemForNumber);
       }
 
-      cardContent.set(num, { isStory, isWin, message, hint, next });
+      let message;
+      if (isStory) {
+        message = DECKS[mode].story;
+      } else if (isWin) {
+        message = '\u{1F389} You escaped!';
+      } else {
+        message = mode === 'hard' ? '✓ Item found!' : '✓ Nicely done!';
+      }
+
+      const backType = mode === 'hard' ? 'item' : 'number';
+      const backItem = mode === 'hard' ? itemForNumber[num] : null;
+
+      cardContent.set(num, { isStory, isWin, next, message, hint, backType, backItem });
     });
 
     currentTarget = cardContent.get(STORY_NUMBER).next;
@@ -650,9 +1080,17 @@
 
   function dealCards() {
     if (deckEl.dataset.empty === 'true') return;
+    performDeal();
+  }
+
+  function performDeal() {
     tableEl.innerHTML = '';
+    winOverlayEl.classList.remove('open');
+    gameOverOverlayEl.classList.remove('open');
+    zoomOverlay.classList.remove('open');
+    mistakes = 0;
     const numbers = orderedNumbers(CARD_COUNT);
-    buildCardContent(numbers);
+    buildCardContent(currentMode, numbers);
 
     numbers.forEach((num, index) => {
       const content = cardContent.get(num);
@@ -661,10 +1099,14 @@
       card.style.animationDelay = (index * 0.06) + 's';
       card.dataset.number = num;
 
+      const backInner = content.backType === 'item'
+        ? `<div class="item-icon">${content.backItem.emoji}</div><div class="item-name">${content.backItem.name}</div>`
+        : `<div class="card-number">${num}</div>`;
+
       card.innerHTML = `
         <div class="card-inner">
           <div class="card-face card-back">
-            <div class="card-number">${num}</div>
+            ${backInner}
           </div>
           <div class="card-face card-front${content.isStory ? ' story' : content.isWin ? ' win' : ''}">
             <div class="message">${content.message}</div>
@@ -686,6 +1128,9 @@
         }
         card.classList.add('flipped');
         currentTarget = content.next;
+        if (content.isWin) {
+          setTimeout(triggerWin, 700);
+        }
       });
       tableEl.appendChild(card);
     });
@@ -694,6 +1139,8 @@
     deckCountEl.textContent = '0';
     deckHintEl.textContent = 'All cards dealt';
 
+    deckWrapEl.classList.remove('gone');
+    deckWrapEl.style.display = '';
     deckWrapEl.classList.add('gone');
     deckWrapEl.addEventListener('transitionend', () => {
       deckWrapEl.style.display = 'none';
@@ -701,24 +1148,51 @@
 
     lives = MAX_LIVES;
     renderLives();
+    startTime = Date.now();
   }
-
-  renderLives();
 
   deckEl.addEventListener('click', dealCards);
 
-  const zoomOverlay = document.getElementById('zoomOverlay');
-  const zoomCardEl = document.getElementById('zoomCard');
-  const zoomNumberEl = document.getElementById('zoomNumber');
-  const zoomMessageEl = document.getElementById('zoomMessage');
-  const zoomHintEl = document.getElementById('zoomHint');
-  const zoomCloseEl = document.getElementById('zoomClose');
+  // --- Win flow ---
+
+  function triggerWin() {
+    const elapsedMs = Date.now() - startTime;
+    const progress = loadProgress();
+    const prev = progress[currentMode] || {};
+    const isNewBest = !prev.bestTimeMs || elapsedMs < prev.bestTimeMs;
+    progress[currentMode] = {
+      completed: true,
+      bestTimeMs: isNewBest ? elapsedMs : prev.bestTimeMs,
+    };
+    saveProgress(progress);
+
+    winTimeEl.textContent = formatTime(elapsedMs);
+    winMistakesEl.textContent = mistakes === 0
+      ? 'None — perfect run!'
+      : mistakes + (mistakes === 1 ? ' mistake' : ' mistakes');
+    winNewBestEl.hidden = !isNewBest;
+    winOverlayEl.classList.add('open');
+  }
+
+  winPlayAgainEl.addEventListener('click', () => {
+    winOverlayEl.classList.remove('open');
+    performDeal();
+  });
+
+  winHomeEl.addEventListener('click', () => {
+    winOverlayEl.classList.remove('open');
+    goHome();
+  });
+
+  // --- Zoom overlay ---
 
   function openZoom(num) {
     const content = cardContent.get(num);
     zoomCardEl.classList.toggle('story', content.isStory);
     zoomCardEl.classList.toggle('win', content.isWin);
-    zoomNumberEl.textContent = 'Card ' + num;
+    zoomNumberEl.textContent = content.backType === 'item' && content.backItem
+      ? content.backItem.emoji + ' ' + content.backItem.name
+      : 'Card ' + num;
     zoomMessageEl.textContent = content.message;
     zoomHintEl.textContent = content.hint;
     zoomOverlay.classList.add('open');
@@ -735,6 +1209,10 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeZoom();
   });
+
+  // --- Init ---
+
+  renderHome();
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
