@@ -27,7 +27,24 @@
     font-size: 20px;
     font-weight: 600;
     color: #e4e7ee;
-    margin: 0 0 24px;
+    margin: 0 0 12px;
+  }
+
+  .lives {
+    text-align: center;
+    font-size: 26px;
+    letter-spacing: 8px;
+    margin-bottom: 24px;
+  }
+
+  .life {
+    display: inline-block;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+  }
+
+  .life.lost {
+    opacity: 0.35;
+    transform: scale(0.85);
   }
 
   .scene {
@@ -122,6 +139,19 @@
       opacity: 1;
       transform: translateY(0) scale(1);
     }
+  }
+
+  .card.wrong {
+    animation: shake 0.4s ease;
+    box-shadow: 0 0 0 3px rgba(224, 82, 82, 0.6);
+    border-radius: 10px;
+  }
+
+  @keyframes shake {
+    10%, 90% { transform: translateX(-3px); }
+    20%, 80% { transform: translateX(5px); }
+    30%, 50%, 70% { transform: translateX(-7px); }
+    40%, 60% { transform: translateX(7px); }
   }
 
   .card-inner {
@@ -330,11 +360,78 @@
   .zoom-close:hover {
     background: rgba(0, 0, 0, 0.5);
   }
+
+  /* --- Game over overlay --- */
+
+  .gameover-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 9, 12, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    padding: 16px;
+  }
+
+  .gameover-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .gameover-card {
+    width: min(90vw, 360px);
+    background: linear-gradient(135deg, #6a2f2f, #3f1c1c);
+    border: 2px solid #e05252;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    padding: 36px 28px;
+    text-align: center;
+    transform: scale(0.85);
+    transition: transform 0.3s ease;
+  }
+
+  .gameover-overlay.open .gameover-card {
+    transform: scale(1);
+  }
+
+  .gameover-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #f9d8d8;
+    margin-bottom: 10px;
+  }
+
+  .gameover-message {
+    font-size: 14px;
+    color: #e0b9b9;
+    margin-bottom: 24px;
+  }
+
+  .gameover-button {
+    border: none;
+    border-radius: 8px;
+    background: #e05252;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px 24px;
+    cursor: pointer;
+  }
+
+  .gameover-button:hover {
+    background: #ea6868;
+  }
 </style>
 </head>
 <body>
 
 <h1>Escape Room Card Game</h1>
+
+<div class="lives" id="livesDisplay"></div>
 
 <div class="scene">
   <div class="deck-wrap" id="deckWrap">
@@ -362,6 +459,14 @@
   </div>
 </div>
 
+<div class="gameover-overlay" id="gameOverOverlay">
+  <div class="gameover-card">
+    <div class="gameover-title">&#128128; Game Over</div>
+    <div class="gameover-message">You ran out of lives. Give it another try!</div>
+    <button class="gameover-button" id="gameOverRestart">Start Again</button>
+  </div>
+</div>
+
 <script>
   const CARD_COUNT = 12;
 
@@ -378,6 +483,41 @@
   const deckHintEl = document.getElementById('deckHint');
 
   const cardContent = new Map();
+  const MAX_LIVES = 3;
+  let lives = MAX_LIVES;
+  let currentTarget = null;
+
+  const livesDisplayEl = document.getElementById('livesDisplay');
+  const gameOverOverlayEl = document.getElementById('gameOverOverlay');
+  const gameOverRestartEl = document.getElementById('gameOverRestart');
+
+  function renderLives() {
+    livesDisplayEl.innerHTML = '';
+    for (let i = 0; i < MAX_LIVES; i++) {
+      const life = document.createElement('span');
+      life.className = 'life' + (i < lives ? '' : ' lost');
+      life.textContent = '❤️';
+      livesDisplayEl.appendChild(life);
+    }
+  }
+
+  function triggerWrongFeedback(card) {
+    card.classList.remove('wrong');
+    void card.offsetWidth;
+    card.classList.add('wrong');
+  }
+
+  function loseLife() {
+    lives--;
+    renderLives();
+    if (lives <= 0) {
+      gameOverOverlayEl.classList.add('open');
+    }
+  }
+
+  gameOverRestartEl.addEventListener('click', () => {
+    location.reload();
+  });
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -395,22 +535,25 @@
     chain.forEach((num, i) => {
       const isStory = i === 0;
       const isWin = i === chain.length - 1;
+      const next = isWin ? null : chain[i + 1];
       let message;
       let hint;
 
       if (isStory) {
         message = 'Help Lucy find her lost dog!';
-        hint = 'Flip over card ' + chain[i + 1] + '!';
+        hint = 'Flip over card ' + next + '!';
       } else if (isWin) {
         message = '\u{1F389} You escaped!';
         hint = 'The End';
       } else {
         message = '✓ Nicely done!';
-        hint = 'Flip over card ' + chain[i + 1] + '!';
+        hint = 'Flip over card ' + next + '!';
       }
 
-      cardContent.set(num, { isStory, isWin, message, hint });
+      cardContent.set(num, { isStory, isWin, message, hint, next });
     });
+
+    currentTarget = cardContent.get(STORY_NUMBER).next;
   }
 
   function dealCards() {
@@ -437,11 +580,17 @@
       `;
 
       card.addEventListener('click', () => {
-        if (!card.classList.contains('flipped')) {
-          card.classList.add('flipped');
-        } else {
+        if (card.classList.contains('flipped')) {
           openZoom(num);
+          return;
         }
+        if (num !== currentTarget) {
+          triggerWrongFeedback(card);
+          loseLife();
+          return;
+        }
+        card.classList.add('flipped');
+        currentTarget = content.next;
       });
       tableEl.appendChild(card);
     });
@@ -454,7 +603,12 @@
     deckWrapEl.addEventListener('transitionend', () => {
       deckWrapEl.style.display = 'none';
     }, { once: true });
+
+    lives = MAX_LIVES;
+    renderLives();
   }
+
+  renderLives();
 
   deckEl.addEventListener('click', dealCards);
 
