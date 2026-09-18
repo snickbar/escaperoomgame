@@ -620,6 +620,30 @@
     background: rgba(255, 255, 255, 0.18);
   }
 
+  .puzzle-reveal-toggle {
+    border: none;
+    background: none;
+    color: #7a8194;
+    font-size: 11px;
+    text-decoration: underline;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 4px;
+  }
+
+  .puzzle-reveal-toggle:hover {
+    color: #9aa0ad;
+  }
+
+  .puzzle-reveal {
+    font-size: 12px;
+    color: #ffd76a;
+    font-weight: 600;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 6px;
+    padding: 6px 10px;
+  }
+
   /* --- Game over overlay --- */
 
   .gameover-overlay {
@@ -873,6 +897,8 @@
       </div>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
+      <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
+      <div class="puzzle-reveal" id="puzzleReveal" hidden></div>
     </div>
   </div>
 </div>
@@ -1014,7 +1040,7 @@
       const code = ch.charCodeAt(0) - 65;
       return String.fromCharCode(((code + shift) % 26) + 65);
     }).join('');
-    return { ciphertext, shift, answer: target, solved: false };
+    return { ciphertext, shift, answer: target, solved: false, reveal: phrase + ' (' + target + ')' };
   }
 
   function mediumHintText(target) {
@@ -1104,6 +1130,8 @@
   const puzzleSubmitEl = document.getElementById('puzzleSubmit');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleAgainEl = document.getElementById('puzzleAgain');
+  const puzzleRevealToggleEl = document.getElementById('puzzleRevealToggle');
+  const puzzleRevealEl = document.getElementById('puzzleReveal');
 
   // --- State ---
 
@@ -1497,6 +1525,16 @@
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
+    puzzleRevealEl.hidden = true;
+    puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
+    puzzleRevealToggleEl.onclick = () => {
+      const showing = !puzzleRevealEl.hidden;
+      puzzleRevealEl.hidden = showing;
+      puzzleRevealToggleEl.textContent = showing
+        ? '\u{1F50D} Show Answer (dev)'
+        : '\u{1F648} Hide Answer';
+      puzzleRevealEl.textContent = 'Decoded: ' + p.reveal;
+    };
 
     const submit = () => {
       const guess = parseInt(puzzleInputEl.value, 10);
