@@ -604,6 +604,22 @@
     color: #ff9a9a;
   }
 
+  .puzzle-again {
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #d8f5e6;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .puzzle-again:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
   /* --- Game over overlay --- */
 
   .gameover-overlay {
@@ -809,6 +825,13 @@
   <div class="deck-grid" id="deckGrid"></div>
 </div>
 
+<div id="miniGamesScreen" hidden>
+  <button class="home-link" id="miniGamesHomeLink">&larr; Back to decks</button>
+  <h1>Mini-Games</h1>
+  <p class="home-subtitle">Pick one to try it out on its own</p>
+  <div class="deck-grid" id="miniGamesGrid"></div>
+</div>
+
 <div id="gameScreen" hidden>
   <button class="home-link" id="homeLink">&larr; Back to decks</button>
   <h1 id="gameTitle">Escape Room Card Game</h1>
@@ -849,6 +872,7 @@
         <button class="puzzle-submit" id="puzzleSubmit">Submit</button>
       </div>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
+      <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
     </div>
   </div>
 </div>
@@ -908,6 +932,16 @@
       tagline: 'Combine items to craft your escape',
       accent: '#e05252',
       story: 'Combine items to craft your escape!',
+    },
+  };
+
+  const MINI_GAMES = {
+    cipher: {
+      id: 'cipher',
+      label: 'Cipher',
+      icon: '\u{1F510}',
+      tagline: 'Decode a shifted message to reveal a number',
+      accent: '#cfa04c',
     },
   };
 
@@ -1034,6 +1068,10 @@
   const gameTitleEl = document.getElementById('gameTitle');
   const homeLinkEl = document.getElementById('homeLink');
 
+  const miniGamesScreenEl = document.getElementById('miniGamesScreen');
+  const miniGamesGridEl = document.getElementById('miniGamesGrid');
+  const miniGamesHomeLinkEl = document.getElementById('miniGamesHomeLink');
+
   const deckEl = document.getElementById('deck');
   const deckWrapEl = document.getElementById('deckWrap');
   const tableEl = document.getElementById('table');
@@ -1065,6 +1103,7 @@
   const puzzleInputEl = document.getElementById('puzzleInput');
   const puzzleSubmitEl = document.getElementById('puzzleSubmit');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
+  const puzzleAgainEl = document.getElementById('puzzleAgain');
 
   // --- State ---
 
@@ -1096,13 +1135,53 @@
       tile.addEventListener('click', () => startDeck(deck.id));
       deckGridEl.appendChild(tile);
     });
+
+    const miniGamesTile = document.createElement('button');
+    miniGamesTile.className = 'deck-tile';
+    miniGamesTile.style.borderColor = '#8b93a5';
+    miniGamesTile.innerHTML = `
+      <div class="deck-icon">\u{1F3AE}</div>
+      <div class="deck-info">
+        <div class="deck-name">Mini-Games</div>
+        <div class="deck-tagline">Try out each puzzle type on its own</div>
+      </div>
+    `;
+    miniGamesTile.addEventListener('click', goToMiniGames);
+    deckGridEl.appendChild(miniGamesTile);
   }
 
   function goHome() {
     gameScreenEl.hidden = true;
+    miniGamesScreenEl.hidden = true;
     homeScreenEl.hidden = false;
     renderHome();
   }
+
+  function renderMiniGames() {
+    miniGamesGridEl.innerHTML = '';
+    Object.values(MINI_GAMES).forEach((game) => {
+      const tile = document.createElement('button');
+      tile.className = 'deck-tile';
+      tile.style.borderColor = game.accent;
+      tile.innerHTML = `
+        <div class="deck-icon">${game.icon}</div>
+        <div class="deck-info">
+          <div class="deck-name">${game.label}</div>
+          <div class="deck-tagline">${game.tagline}</div>
+        </div>
+      `;
+      tile.addEventListener('click', () => openTestPuzzle(game.id));
+      miniGamesGridEl.appendChild(tile);
+    });
+  }
+
+  function goToMiniGames() {
+    homeScreenEl.hidden = true;
+    miniGamesScreenEl.hidden = false;
+    renderMiniGames();
+  }
+
+  miniGamesHomeLinkEl.addEventListener('click', goHome);
 
   function startDeck(modeId) {
     currentMode = modeId;
@@ -1406,29 +1485,38 @@
     zoomOverlay.classList.add('open');
   }
 
-  function renderPuzzle(content, num) {
+  function renderPuzzle(content, num, opts) {
+    opts = opts || {};
+    const isTest = !!opts.isTest;
     const p = content.puzzle;
     puzzleCipherEl.textContent = p.ciphertext;
     puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
-      ' in the alphabet. Decode the message to find your next card number.';
+      ' in the alphabet. Decode the message to reveal the hidden number.';
     puzzleInputEl.value = '';
+    puzzleInputEl.placeholder = isTest ? 'Number' : 'Card #';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
+    puzzleAgainEl.hidden = true;
 
     const submit = () => {
       const guess = parseInt(puzzleInputEl.value, 10);
       if (guess === p.answer) {
         p.solved = true;
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
         puzzleFeedbackEl.className = 'puzzle-feedback correct';
-        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
-          zoomCardEl.classList.remove('has-puzzle');
-          zoomHintEl.hidden = false;
-          zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        }, 900);
+        if (isTest) {
+          puzzleFeedbackEl.textContent = '✓ Correct! The number was ' + p.answer + '.';
+          puzzleAgainEl.hidden = false;
+        } else {
+          puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+          const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+          if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          setTimeout(() => {
+            zoomCardEl.classList.remove('has-puzzle');
+            zoomHintEl.hidden = false;
+            zoomPuzzleEl.hidden = true;
+            zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          }, 900);
+        }
       } else {
         puzzleFeedbackEl.textContent = 'Not quite — try again!';
         puzzleFeedbackEl.className = 'puzzle-feedback wrong';
@@ -1439,6 +1527,38 @@
     puzzleInputEl.onkeydown = (e) => {
       if (e.key === 'Enter') submit();
     };
+    puzzleAgainEl.onclick = () => {
+      if (opts.onRetry) opts.onRetry();
+    };
+  }
+
+  function openTestPuzzle(type) {
+    const game = MINI_GAMES[type];
+    let content = null;
+
+    if (type === 'cipher') {
+      const target = 1 + Math.floor(Math.random() * CARD_COUNT);
+      content = {
+        isStory: false,
+        isWin: false,
+        message: '\u{1F9EA} ' + game.label + ' — Test Mode',
+        puzzle: makeCipherPuzzle(target),
+        backItem: null,
+      };
+    }
+
+    if (!content) return;
+
+    zoomCardEl.classList.remove('story', 'win');
+    zoomCardEl.classList.add('has-puzzle');
+    zoomNumberEl.textContent = game.label + ' Test';
+    zoomMessageEl.textContent = content.message;
+    zoomHintEl.hidden = true;
+    zoomPuzzleEl.hidden = false;
+
+    renderPuzzle(content, null, { isTest: true, onRetry: () => openTestPuzzle(type) });
+
+    zoomOverlay.classList.add('open');
   }
 
   function closeZoom() {
