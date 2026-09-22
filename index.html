@@ -1033,6 +1033,14 @@
   const CHAIN_LENGTH = CARD_COUNT - TRAP_COUNT;
   const PROGRESS_KEY = 'escapeRoomProgress';
 
+  // Story Mode: a branching table where several cards can be "unlocked" at
+  // once (instead of one linear next-card-only chain), numbers are random
+  // instead of counting up, and unused slots are traps.
+  const STORY_MODE_TABLE_SIZE = 50;
+  const STORY_MODE_USED_RATIO = 0.7;
+  const STORY_MODE_USED_COUNT = Math.round(STORY_MODE_TABLE_SIZE * STORY_MODE_USED_RATIO);
+  const STORY_MODE_NUMBER_MAX = 99;
+
   const DECKS = {
     easy: {
       id: 'easy',
@@ -1057,6 +1065,14 @@
       tagline: 'Combine items to craft your escape',
       accent: '#e05252',
       story: 'Combine items to craft your escape!',
+    },
+    story: {
+      id: 'story',
+      label: 'Story',
+      icon: '\u{1F5FA}\u{FE0F}',
+      tagline: 'A branching escape room adventure',
+      accent: '#cfa04c',
+      story: 'Help Lucy find her lost dog!',
     },
   };
 
@@ -1149,6 +1165,14 @@
 
   function orderedNumbers(count) {
     return Array.from({ length: count }, (_, i) => i + 1);
+  }
+
+  // `count` unique numbers drawn from 1..max, already in random order —
+  // used by Story Mode so card values (and their table position) never
+  // just count upward.
+  function randomNumbers(count, max) {
+    const pool = Array.from({ length: max }, (_, i) => i + 1);
+    return shuffle(pool).slice(0, count);
   }
 
   function shuffle(arr) {
@@ -1329,6 +1353,12 @@
   let startTime = 0;
   let mistakes = 0;
 
+  // Story Mode only: the set of card numbers currently safe to flip, and the
+  // set already flipped (used to check when a combo card's two ingredients
+  // have both been found). Legacy modes keep using currentTarget above.
+  let unlockedNumbers = new Set();
+  let flippedNumbers = new Set();
+
   // --- Home screen ---
 
   function renderHome() {
@@ -1408,7 +1438,7 @@
     deckWrapEl.classList.remove('gone');
     deckWrapEl.style.display = '';
     deckEl.dataset.empty = 'false';
-    deckCountEl.textContent = String(CARD_COUNT);
+    deckCountEl.textContent = String(tableSizeForMode(modeId));
     deckHintEl.textContent = 'Click the deck to deal';
     lives = MAX_LIVES;
     renderLives();
@@ -1512,6 +1542,7 @@
     return {
       isStory: false, isWin: false, isSeed: false,
       next: null, message: '', hint: '', backItem: null, puzzle: null,
+      unlocks: [], requires: null,
     };
   }
 
@@ -1636,6 +1667,200 @@
     currentTarget = chain.length > 2 ? chain[2] : null;
   }
 
+  // --- Story Mode: branching chain builder ---
+  //
+  // Builds an abstract graph of `usedCount` nodes (ids 0..usedCount-1,
+  // created in the order below), independent of which real numbers end up
+  // on the cards — buildStoryCardContent() maps ids to numbers afterward.
+  //
+  // Node kinds:
+  //   story  — flavor text, explicitly unlocks 1-2 further nodes
+  //   puzzle — a cipher; solving it reveals exactly 1 further node
+  //   object — an item; unlocks nothing itself, just waits to be paired
+  //   combo  — requires its two object nodes both flipped before it
+  //            unlocks; once flipped it continues the chain like a story
+  //            node
+  //   win    — the escape card; every dead-end node unlocks it
+  function buildStoryGraph(usedCount) {
+    const nodes = [];
+    function makeNode(kind) {
+      const node = { id: nodes.length, kind, unlocks: [], requires: null, isStart: false, isWin: false };
+      nodes.push(node);
+      return node;
+    }
+
+    const root = makeNode('story');
+    root.isStart = true;
+
+    // Reserve one slot for root and one for the win card that closes every
+    // dead-end branch, so the graph always lands on exactly usedCount nodes.
+    let budget = usedCount - 2;
+    const queue = [root];
+
+    while (queue.length && budget > 0) {
+      const node = queue.shift();
+      // A puzzle only ever reveals a single answer, so it can't branch or
+      // kick off a combo — it always gets exactly one child.
+      const isPuzzle = node.kind === 'puzzle';
+      const canCombo = !isPuzzle && budget >= 3;
+      // The very first branch is always an object pair, so a combo (and
+      // therefore its artwork) is guaranteed to appear every game.
+      const wantsCombo = canCombo && (node.isStart || Math.random() < 0.28);
+
+      if (wantsCombo) {
+        const objA = makeNode('object');
+        const objB = makeNode('object');
+        const combo = makeNode('combo');
+        combo.requires = [objA.id, objB.id];
+        node.unlocks.push(objA.id, objB.id);
+        queue.push(combo);
+        budget -= 3;
+      } else {
+        const wantsTwo = !isPuzzle && budget >= 2 && Math.random() < 0.35;
+        const childCount = wantsTwo ? 2 : 1;
+        for (let i = 0; i < childCount && budget > 0; i++) {
+          const kind = Math.random() < 0.55 ? 'story' : 'puzzle';
+          const child = makeNode(kind);
+          node.unlocks.push(child.id);
+          queue.push(child);
+          budget -= 1;
+        }
+      }
+    }
+
+    const win = makeNode('win');
+    win.isWin = true;
+    nodes.forEach((n) => {
+      if (n === win || n.kind === 'object') return;
+      if (n.unlocks.length === 0) n.unlocks.push(win.id);
+    });
+
+    // Safety net: with 55% story / 45% puzzle odds this is astronomically
+    // likely already, but guarantee at least one puzzle exists regardless.
+    if (!nodes.some((n) => n.kind === 'puzzle')) {
+      const candidate = nodes.find((n) => n.kind === 'story' && !n.isStart);
+      if (candidate) candidate.kind = 'puzzle';
+    }
+
+    return nodes;
+  }
+
+  // Hands each combo's two (always-fresh) ingredient nodes a matching
+  // illustrated triad when artwork remains, otherwise a plain emoji item.
+  function assignStoryItems(nodes) {
+    const itemForId = {};
+    const comboPool = shuffle(COMBO_SETS.slice());
+    const emojiPool = shuffle(ITEMS.slice());
+
+    function nextEmoji() {
+      if (emojiPool.length === 0) emojiPool.push(...shuffle(ITEMS.slice()));
+      return emojiPool.pop();
+    }
+
+    nodes.forEach((n) => {
+      if (n.kind !== 'combo') return;
+      const [aId, bId] = n.requires;
+      if (comboPool.length > 0) {
+        const combo = comboPool.pop();
+        itemForId[aId] = combo.a;
+        itemForId[bId] = combo.b;
+        itemForId[n.id] = combo.c;
+      } else {
+        itemForId[aId] = nextEmoji();
+        itemForId[bId] = nextEmoji();
+        itemForId[n.id] = nextEmoji();
+      }
+    });
+
+    return itemForId;
+  }
+
+  function describeUnlocks(nums) {
+    if (!nums || nums.length === 0) return '';
+    if (nums.length === 1) return 'Flip over card ' + nums[0] + '!';
+    return 'Flip over cards ' + nums.join(' and ') + '!';
+  }
+
+  function buildStoryCardContent(numbers) {
+    cardContent.clear();
+    const usedCount = STORY_MODE_USED_COUNT;
+    const usedNumbers = numbers.slice(0, usedCount);
+    const trapNumbers = numbers.slice(usedCount);
+
+    const nodes = buildStoryGraph(usedCount);
+    const numberForId = {};
+    nodes.forEach((n) => { numberForId[n.id] = usedNumbers[n.id]; });
+    const itemForId = assignStoryItems(nodes);
+
+    // Each object's combo (for the "combine with ___" hint on its card).
+    const comboForObjectId = {};
+    nodes.forEach((n) => {
+      if (n.kind === 'combo') n.requires.forEach((id) => { comboForObjectId[id] = n; });
+    });
+
+    nodes.forEach((n) => {
+      const num = numberForId[n.id];
+      const unlockNums = n.unlocks.map((id) => numberForId[id]);
+      const requiresNums = n.requires ? n.requires.map((id) => numberForId[id]) : null;
+      const backItem = itemForId[n.id] || null;
+
+      let message = '';
+      let hint = '';
+      let puzzle = null;
+
+      if (n.isStart) {
+        message = DECKS.story.story;
+        hint = describeUnlocks(unlockNums);
+      } else if (n.isWin) {
+        message = '\u{1F389} You escaped!';
+        hint = 'The End';
+      } else if (n.kind === 'puzzle') {
+        puzzle = makeCipherPuzzle(unlockNums[0]);
+        hint = '\u{1F510} Solve the cipher to find your next card!';
+      } else if (n.kind === 'object') {
+        const combo = comboForObjectId[n.id];
+        const partnerId = combo ? combo.requires.find((id) => id !== n.id) : null;
+        const partnerItem = partnerId != null ? itemForId[partnerId] : null;
+        hint = partnerItem ? ('Combine with ' + itemVisual(partnerItem) + ' ' + partnerItem.name + '!') : '';
+      } else {
+        hint = describeUnlocks(unlockNums);
+      }
+
+      cardContent.set(num, {
+        isStory: n.isStart, isWin: n.isWin, isSeed: n.isStart,
+        unlocks: unlockNums, requires: requiresNums,
+        message, hint, backItem, puzzle,
+      });
+    });
+
+    trapNumbers.forEach((num) => cardContent.set(num, trapContent()));
+
+    const rootNode = nodes.find((n) => n.isStart);
+    const rootNumber = numberForId[rootNode.id];
+    flippedNumbers = new Set([rootNumber]);
+    unlockedNumbers = new Set(cardContent.get(rootNumber).unlocks);
+  }
+
+  // Marks a Story Mode card as flipped, applies whatever it explicitly
+  // unlocks, then re-checks every pending combo in case this was the second
+  // of its two required ingredients.
+  function flipStoryCard(num, content) {
+    unlockedNumbers.delete(num);
+    flippedNumbers.add(num);
+    content.unlocks.forEach((n) => unlockedNumbers.add(n));
+    cardContent.forEach((c, cardNum) => {
+      if (!c.requires || flippedNumbers.has(cardNum)) return;
+      const [a, b] = c.requires;
+      if (flippedNumbers.has(a) && flippedNumbers.has(b)) {
+        unlockedNumbers.add(cardNum);
+      }
+    });
+  }
+
+  function tableSizeForMode(mode) {
+    return mode === 'story' ? STORY_MODE_TABLE_SIZE : CARD_COUNT;
+  }
+
   function dealCards() {
     if (deckEl.dataset.empty === 'true') return;
     performDeal();
@@ -1647,8 +1872,14 @@
     gameOverOverlayEl.classList.remove('open');
     zoomOverlay.classList.remove('open');
     mistakes = 0;
-    const numbers = orderedNumbers(CARD_COUNT);
-    buildCardContent(currentMode, numbers);
+    let numbers;
+    if (currentMode === 'story') {
+      numbers = randomNumbers(STORY_MODE_TABLE_SIZE, STORY_MODE_NUMBER_MAX);
+      buildStoryCardContent(numbers);
+    } else {
+      numbers = orderedNumbers(CARD_COUNT);
+      buildCardContent(currentMode, numbers);
+    }
 
     numbers.forEach((num, index) => {
       const content = cardContent.get(num);
@@ -1685,7 +1916,8 @@
           openZoom(num);
           return;
         }
-        if (num !== currentTarget) {
+        const isCorrect = currentMode === 'story' ? unlockedNumbers.has(num) : num === currentTarget;
+        if (!isCorrect) {
           triggerWrongFeedback(card);
           loseLife();
           return;
@@ -1693,7 +1925,11 @@
         triggerCorrectFeedback(card);
         playCorrectSound();
         card.classList.add('flipped');
-        currentTarget = content.next;
+        if (currentMode === 'story') {
+          flipStoryCard(num, content);
+        } else {
+          currentTarget = content.next;
+        }
         if (content.isWin) {
           setTimeout(triggerWin, 700);
         }
