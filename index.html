@@ -1486,11 +1486,25 @@
     const usedLetters = Array.from(new Set(phrase.replace(/[^A-Z]/g, '').split('')));
     const keyboard = usedLetters.slice().sort();
 
-    // Reveal every instance of 2 or 3 random letters (picked by letter, not
-    // position, so all of that letter's blanks fill in together).
-    const prefillCount = Math.min(usedLetters.length, 2 + Math.floor(Math.random() * 2));
-    const prefillLetters = new Set(shuffle(usedLetters).slice(0, prefillCount));
+    // Reveal the 2 most frequent letters plus one random third one (picked
+    // by letter, not position, so all of that letter's blanks fill in
+    // together) — most-used letters give the biggest head start.
+    const freq = {};
+    phrase.split('').forEach((ch) => { if (ch !== ' ') freq[ch] = (freq[ch] || 0) + 1; });
+    const byFrequency = shuffle(usedLetters).sort((a, b) => freq[b] - freq[a]);
+    const topTwo = byFrequency.slice(0, 2);
+    const remaining = usedLetters.filter((l) => !topTwo.includes(l));
+    const thirdLetter = remaining.length ? pickRandom(remaining) : null;
+    const prefillLetters = new Set(thirdLetter ? [...topTwo, thirdLetter] : topTwo);
     const guesses = phrase.split('').map((ch) => (ch !== ' ' && prefillLetters.has(ch)) ? ch : null);
+
+    // Each distinct letter gets a random number, shown above its blanks —
+    // "LOOK" might display as 1 5 5 9, so a repeated letter is visible as
+    // a repeated number without giving away which letter it is. Filling in
+    // one 5 fills in every other 5 too, same as the letter-grouping below.
+    const shuffledNumbers = shuffle(Array.from({ length: usedLetters.length }, (_, i) => i + 1));
+    const numberForLetter = {};
+    usedLetters.forEach((letter, i) => { numberForLetter[letter] = shuffledNumbers[i]; });
 
     return {
       type: 'cryptogram',
@@ -1504,6 +1518,7 @@
       solved: false,
       guesses,
       keyboard,
+      numberForLetter,
       reveal: phrase + ' (' + target + ')',
     };
   }
@@ -2565,10 +2580,13 @@
         const isCorrect = guess && guess === p.plaintext[i];
         const isWrong = guess && guess !== p.plaintext[i];
 
-        // For the cryptogram, ch IS the real letter (nothing's encoded), so
-        // showing it here would just give away the answer — only the
-        // shift-cipher type gets the encoded-letter hint above the blank.
-        const cipherCharInner = p.type === 'cryptogram' ? '' : `<div class="cipher-cipherchar">${ch}</div>`;
+        // For the cryptogram, showing ch (the real letter) would give away
+        // the answer, so it shows the letter's assigned number instead —
+        // a repeated letter reads as a repeated number, a pattern hint
+        // without revealing which letter it actually is.
+        const cipherCharInner = p.type === 'cryptogram'
+          ? `<div class="cipher-cipherchar">${p.numberForLetter[ch]}</div>`
+          : `<div class="cipher-cipherchar">${ch}</div>`;
         const unit = document.createElement('div');
         unit.className = 'cipher-letter';
         unit.innerHTML = `
