@@ -747,6 +747,16 @@
     background: rgba(224, 82, 82, 0.45);
   }
 
+  .cipher-key.used {
+    background: rgba(255, 255, 255, 0.04);
+    color: #565c6b;
+    cursor: default;
+  }
+
+  .cipher-key.used:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
   /* --- Slide puzzle --- */
 
   .slider-grid {
@@ -2603,15 +2613,23 @@
 
     function renderKeyboard() {
       cipherKeyboardEl.innerHTML = '';
+      // Cryptogram only: a letter already placed anywhere greys out, since
+      // every occurrence of a real letter is always the same group here
+      // (ciphertext === plaintext) — there's never a reason to place it
+      // again elsewhere. Clear it (backspace) to free it back up.
+      const usedLetters = p.type === 'cryptogram' ? new Set(p.guesses.filter(Boolean)) : null;
       p.keyboard.forEach((letter) => {
+        const isUsed = !!usedLetters && usedLetters.has(letter);
         const key = document.createElement('button');
-        key.className = 'cipher-key';
+        key.className = 'cipher-key' + (isUsed ? ' used' : '');
         key.textContent = letter;
+        key.disabled = isUsed;
         key.addEventListener('click', () => {
-          if (activeIndex === -1 || p.solved) return;
+          if (activeIndex === -1 || p.solved || isUsed) return;
           applyGuess(activeIndex, letter);
           advanceActive();
           renderGrid();
+          renderKeyboard();
           checkComplete();
         });
         cipherKeyboardEl.appendChild(key);
@@ -2634,6 +2652,7 @@
           }
         }
         renderGrid();
+        renderKeyboard();
         puzzleFeedbackEl.textContent = '';
         puzzleFeedbackEl.className = 'puzzle-feedback';
       });
