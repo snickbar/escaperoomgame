@@ -747,6 +747,45 @@
     background: rgba(224, 82, 82, 0.45);
   }
 
+  /* --- Slide puzzle --- */
+
+  .slider-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    grid-template-rows: repeat(3, 56px);
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .slider-tile {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #d8f5e6;
+    font-size: 22px;
+    font-weight: 700;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+  }
+
+  .slider-tile.movable {
+    background: rgba(76, 175, 125, 0.28);
+    cursor: pointer;
+  }
+
+  .slider-tile.movable:hover {
+    background: rgba(76, 175, 125, 0.42);
+  }
+
+  .slider-tile-blank {
+    visibility: hidden;
+  }
+
   .puzzle-feedback {
     font-size: 13px;
     font-weight: 600;
@@ -1048,9 +1087,10 @@
     <div class="zoom-message" id="zoomMessage"></div>
     <div class="zoom-hint" id="zoomHint"></div>
     <div class="zoom-puzzle" id="zoomPuzzle" hidden>
-      <div class="cipher-grid" id="cipherGrid"></div>
       <div class="puzzle-instructions" id="puzzleInstructions"></div>
+      <div class="cipher-grid" id="cipherGrid"></div>
       <div class="cipher-keyboard" id="cipherKeyboard"></div>
+      <div class="slider-grid" id="sliderGrid" hidden></div>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
       <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
@@ -1193,6 +1233,13 @@
       icon: '\u{1F510}',
       tagline: 'Decode a shifted message to reveal a number',
       accent: '#cfa04c',
+    },
+    slider: {
+      id: 'slider',
+      label: 'Slide Puzzle',
+      icon: '\u{1F532}',
+      tagline: 'Slide the tiles into order to reveal a number',
+      accent: '#4c9df0',
     },
   };
 
@@ -1362,6 +1409,7 @@
     const keyboard = [...needed, ...extra].sort();
 
     return {
+      type: 'cipher',
       ciphertext,
       plaintext: phrase,
       shift,
@@ -1372,6 +1420,64 @@
       reveal: phrase + ' (' + target + ')',
     };
   }
+
+  // --- Slide puzzle: classic 3x3 sliding tiles (an "8-puzzle") ---
+
+  const SLIDER_SIZE = 3;
+  const SLIDER_SOLVED = [1, 2, 3, 4, 5, 6, 7, 8, null];
+
+  function sliderNeighbors(idx) {
+    const row = Math.floor(idx / SLIDER_SIZE);
+    const col = idx % SLIDER_SIZE;
+    const result = [];
+    if (row > 0) result.push(idx - SLIDER_SIZE);
+    if (row < SLIDER_SIZE - 1) result.push(idx + SLIDER_SIZE);
+    if (col > 0) result.push(idx - 1);
+    if (col < SLIDER_SIZE - 1) result.push(idx + 1);
+    return result;
+  }
+
+  // Shuffles by making random *legal* slide moves from the solved state, so
+  // the result is always solvable (a plain random shuffle of a sliding
+  // puzzle is only solvable half the time).
+  function shuffledSliderTiles() {
+    const tiles = SLIDER_SOLVED.slice();
+    let blankIdx = tiles.indexOf(null);
+    let lastIdx = -1;
+    const moves = 120 + Math.floor(Math.random() * 60);
+    for (let i = 0; i < moves; i++) {
+      const options = sliderNeighbors(blankIdx).filter((n) => n !== lastIdx);
+      const swapIdx = options[Math.floor(Math.random() * options.length)];
+      [tiles[blankIdx], tiles[swapIdx]] = [tiles[swapIdx], tiles[blankIdx]];
+      lastIdx = blankIdx;
+      blankIdx = swapIdx;
+    }
+    return tiles;
+  }
+
+  function makeSliderPuzzle(target) {
+    let tiles = shuffledSliderTiles();
+    // 120+ legal moves makes an already-solved result astronomically
+    // unlikely, but a puzzle you don't even have to touch isn't a puzzle.
+    let guard = 0;
+    while (tiles.every((v, i) => v === SLIDER_SOLVED[i]) && guard < 5) {
+      tiles = shuffledSliderTiles();
+      guard++;
+    }
+    return {
+      type: 'slider',
+      tiles,
+      answer: target,
+      solved: false,
+      reveal: 'Flip over card ' + target + '!',
+    };
+  }
+
+  // Story Mode picks one of these at random for each puzzle card.
+  const PUZZLE_GENERATORS = [
+    { make: makeCipherPuzzle, hint: '\u{1F510} Solve the cipher to find your next card!' },
+    { make: makeSliderPuzzle, hint: '\u{1F532} Solve the slide puzzle to find your next card!' },
+  ];
 
   function mediumHintText(target) {
     const useSubtraction = Math.random() < 0.4;
@@ -1458,6 +1564,7 @@
   const zoomPuzzleEl = document.getElementById('zoomPuzzle');
   const cipherGridEl = document.getElementById('cipherGrid');
   const cipherKeyboardEl = document.getElementById('cipherKeyboard');
+  const sliderGridEl = document.getElementById('sliderGrid');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleAgainEl = document.getElementById('puzzleAgain');
@@ -1992,8 +2099,9 @@
         message = '\u{1F389} You escaped!';
         hint = 'The End';
       } else if (n.kind === 'puzzle') {
-        puzzle = makeCipherPuzzle(unlockNums[0]);
-        hint = '\u{1F510} Solve the cipher to find your next card!';
+        const generator = pickRandom(PUZZLE_GENERATORS);
+        puzzle = generator.make(unlockNums[0]);
+        hint = generator.hint;
       } else if (n.kind === 'object') {
         // No "combine with ___" pointer — the player has to notice the
         // pairing themselves from the artwork.
@@ -2218,10 +2326,24 @@
     zoomOverlay.classList.add('open');
   }
 
+  // Dispatches to the right puzzle-type renderer. Each renderer owns its
+  // own grid container and hides the others.
   function renderPuzzle(content, num, opts) {
+    if (content.puzzle.type === 'slider') {
+      renderSliderPuzzle(content, num, opts);
+    } else {
+      renderCipherPuzzle(content, num, opts);
+    }
+  }
+
+  function renderCipherPuzzle(content, num, opts) {
     opts = opts || {};
     const isTest = !!opts.isTest;
     const p = content.puzzle;
+
+    cipherGridEl.hidden = false;
+    cipherKeyboardEl.hidden = false;
+    sliderGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
       ' in the alphabet. Tap a blank, then tap a letter — matching letters fill in too.';
@@ -2386,17 +2508,93 @@
     };
   }
 
+  function renderSliderPuzzle(content, num, opts) {
+    opts = opts || {};
+    const isTest = !!opts.isTest;
+    const p = content.puzzle;
+
+    cipherGridEl.hidden = true;
+    cipherKeyboardEl.hidden = true;
+    sliderGridEl.hidden = false;
+
+    puzzleInstructionsEl.textContent = 'Slide the tiles into order, 1 through 8. Tap any ' +
+      'tile next to the empty space to move it there.';
+    puzzleFeedbackEl.textContent = '';
+    puzzleFeedbackEl.className = 'puzzle-feedback';
+    puzzleAgainEl.hidden = true;
+    puzzleRevealEl.hidden = true;
+    puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
+    puzzleRevealToggleEl.onclick = () => {
+      const showing = !puzzleRevealEl.hidden;
+      puzzleRevealEl.hidden = showing;
+      puzzleRevealToggleEl.textContent = showing
+        ? '\u{1F50D} Show Answer (dev)'
+        : '\u{1F648} Hide Answer';
+      puzzleRevealEl.textContent = p.reveal;
+    };
+
+    function solvePuzzle() {
+      p.solved = true;
+      puzzleFeedbackEl.className = 'puzzle-feedback correct';
+      if (isTest) {
+        puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
+        puzzleAgainEl.hidden = false;
+      } else {
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      }
+    }
+
+    function renderTiles() {
+      sliderGridEl.innerHTML = '';
+      const blankIdx = p.tiles.indexOf(null);
+      const movable = p.solved ? [] : sliderNeighbors(blankIdx);
+      p.tiles.forEach((value, i) => {
+        const tile = document.createElement('button');
+        const isBlank = value === null;
+        tile.className = 'slider-tile' + (isBlank ? ' slider-tile-blank' : '') +
+          (movable.includes(i) ? ' movable' : '');
+        tile.textContent = isBlank ? '' : String(value);
+        tile.disabled = isBlank || p.solved;
+        tile.addEventListener('click', () => {
+          if (p.solved || !movable.includes(i)) return;
+          p.tiles[blankIdx] = value;
+          p.tiles[i] = null;
+          renderTiles();
+          if (p.tiles.every((v, idx) => v === SLIDER_SOLVED[idx])) {
+            solvePuzzle();
+            renderTiles();
+          }
+        });
+        sliderGridEl.appendChild(tile);
+      });
+    }
+
+    renderTiles();
+
+    puzzleAgainEl.onclick = () => {
+      if (opts.onRetry) opts.onRetry();
+    };
+  }
+
   function openTestPuzzle(type) {
     const game = MINI_GAMES[type];
     let content = null;
 
-    if (type === 'cipher') {
+    if (type === 'cipher' || type === 'slider') {
       const target = 1 + Math.floor(Math.random() * CARD_COUNT);
       content = {
         isStory: false,
         isWin: false,
         message: '\u{1F9EA} ' + game.label + ' — Test Mode',
-        puzzle: makeCipherPuzzle(target),
+        puzzle: type === 'cipher' ? makeCipherPuzzle(target) : makeSliderPuzzle(target),
         backItem: null,
       };
     }
