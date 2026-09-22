@@ -1035,11 +1035,17 @@
 
   // Story Mode: a branching table where several cards can be "unlocked" at
   // once (instead of one linear next-card-only chain), numbers are random
-  // instead of counting up, and unused slots are traps.
-  const STORY_MODE_TABLE_SIZE = 50;
-  const STORY_MODE_USED_RATIO = 0.7;
-  const STORY_MODE_USED_COUNT = Math.round(STORY_MODE_TABLE_SIZE * STORY_MODE_USED_RATIO);
+  // instead of counting up, and unused slots are traps. Table size and the
+  // used/trap split both vary randomly within these ranges on every deal.
+  const STORY_MODE_TABLE_SIZE_MIN = 40;
+  const STORY_MODE_TABLE_SIZE_MAX = 80;
+  const STORY_MODE_USED_RATIO_MIN = 0.6;
+  const STORY_MODE_USED_RATIO_MAX = 0.9;
   const STORY_MODE_NUMBER_MAX = 99;
+
+  function randomInt(min, max) {
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
 
   const DECKS = {
     easy: {
@@ -1153,6 +1159,12 @@
     { a: { img: 'art/items/candle-a.jpg', name: 'Candle' },
       b: { img: 'art/items/candle-b.jpg', name: 'Matches' },
       c: { img: 'art/items/candle-c.jpg', name: 'Lit Candle' } },
+    { a: { img: 'art/items/camera-a.jpg', name: 'Empty Camera' },
+      b: { img: 'art/items/camera-b.jpg', name: 'Film Roll' },
+      c: { img: 'art/items/camera-c.jpg', name: 'Loaded Camera' } },
+    { a: { img: 'art/items/vial-a.jpg', name: 'Vial of Serum' },
+      b: { img: 'art/items/vial-b.jpg', name: 'Empty Syringe' },
+      c: { img: 'art/items/vial-c.jpg', name: 'Filled Syringe' } },
   ];
 
   function itemVisual(item) {
@@ -1781,9 +1793,8 @@
     return 'Flip over cards ' + nums.join(' and ') + '!';
   }
 
-  function buildStoryCardContent(numbers) {
+  function buildStoryCardContent(numbers, usedCount) {
     cardContent.clear();
-    const usedCount = STORY_MODE_USED_COUNT;
     const usedNumbers = numbers.slice(0, usedCount);
     const trapNumbers = numbers.slice(usedCount);
 
@@ -1858,7 +1869,9 @@
   }
 
   function tableSizeForMode(mode) {
-    return mode === 'story' ? STORY_MODE_TABLE_SIZE : CARD_COUNT;
+    // Story Mode's table size isn't decided until it's dealt, so the
+    // pre-deal preview shows the range rather than a committed number.
+    return mode === 'story' ? (STORY_MODE_TABLE_SIZE_MIN + '–' + STORY_MODE_TABLE_SIZE_MAX) : CARD_COUNT;
   }
 
   function dealCards() {
@@ -1874,8 +1887,13 @@
     mistakes = 0;
     let numbers;
     if (currentMode === 'story') {
-      numbers = randomNumbers(STORY_MODE_TABLE_SIZE, STORY_MODE_NUMBER_MAX);
-      buildStoryCardContent(numbers);
+      // Table size and the used/trap split both vary every deal, including
+      // on "Play Again" — no two games have the same shape.
+      const tableSize = randomInt(STORY_MODE_TABLE_SIZE_MIN, STORY_MODE_TABLE_SIZE_MAX);
+      const usedRatio = STORY_MODE_USED_RATIO_MIN + Math.random() * (STORY_MODE_USED_RATIO_MAX - STORY_MODE_USED_RATIO_MIN);
+      const usedCount = Math.round(tableSize * usedRatio);
+      numbers = randomNumbers(tableSize, STORY_MODE_NUMBER_MAX);
+      buildStoryCardContent(numbers, usedCount);
     } else {
       numbers = orderedNumbers(CARD_COUNT);
       buildCardContent(currentMode, numbers);
