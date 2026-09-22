@@ -1,4 +1,4 @@
-const CACHE_NAME = 'escape-room-v17';
+const CACHE_NAME = 'escape-room-v18';
 const ITEM_ART_THEMES = [
   'bike-tire', 'camera', 'campfire', 'candle', 'cut-fence', 'fish-hook',
   'flashlight', 'mirror', 'old-diary', 'parrot-cage', 'pencil', 'rose',
@@ -7,6 +7,7 @@ const ITEM_ART_THEMES = [
 const ASSETS = [
   './',
   './index.html',
+  './gallery.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

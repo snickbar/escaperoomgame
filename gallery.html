@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Escape Room Art Gallery</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖼️</text></svg>">
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #14161c;
+    font-family: system-ui, -apple-system, sans-serif;
+    color: #cfd3dc;
+    padding: calc(24px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .home-link {
+    display: block;
+    margin: 0 0 16px;
+    background: none;
+    border: none;
+    color: #9aa0ad;
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 10px;
+    text-decoration: none;
+  }
+
+  .home-link:hover {
+    color: #cfd3dc;
+  }
+
+  h1 {
+    font-size: 26px;
+    margin: 0 0 6px;
+    color: #d8f5e6;
+  }
+
+  .subtitle {
+    color: #9aa0ad;
+    font-size: 14px;
+    margin: 0 0 28px;
+    line-height: 1.5;
+  }
+
+  .status {
+    color: #9aa0ad;
+    font-size: 14px;
+    padding: 40px 0;
+    text-align: center;
+  }
+
+  .status.error {
+    color: #ff9a9a;
+  }
+
+  .theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  .theme-card {
+    background: linear-gradient(135deg, #1c2028, #14161c);
+    border: 1px solid #2a2e38;
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .theme-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #7a8194;
+    margin: 0 0 12px;
+  }
+
+  .triad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .item img {
+    width: 100%;
+    aspect-ratio: 385 / 507;
+    object-fit: cover;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    display: block;
+    background: #1c2028;
+  }
+
+  .item-label {
+    font-size: 10px;
+    color: #9aa0ad;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .item.result .item-label {
+    color: #7ee6a8;
+    font-weight: 600;
+  }
+
+  .count {
+    color: #9aa0ad;
+    font-size: 13px;
+    margin: 28px 0 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="home-link" href="./index.html">&larr; Back to the game</a>
+  <h1>&#128444;&#65039; Art Gallery</h1>
+  <p class="subtitle">Every combo triad in the game — blue and yellow ingredients combine into the green result. Loaded straight from the game's own data, so this stays current as more get added.</p>
+  <div id="status" class="status">Loading artwork&hellip;</div>
+  <div id="gallery" class="theme-grid"></div>
+  <p id="count" class="count" hidden></p>
+</div>
+<script>
+  fetch('./index.html')
+    .then((r) => {
+      if (!r.ok) throw new Error('index.html responded with ' + r.status);
+      return r.text();
+    })
+    .then((html) => {
+      const match = html.match(/const COMBO_SETS = (\[[\s\S]*?\n  \]);/);
+      if (!match) throw new Error('Could not find COMBO_SETS in index.html');
+      // Safe to evaluate: this is our own trusted file, not user input.
+      const COMBO_SETS = new Function('return ' + match[1])();
+      renderGallery(COMBO_SETS);
+    })
+    .catch((err) => {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = 'Could not load the artwork: ' + err.message;
+      statusEl.classList.add('error');
+    });
+
+  function themeNameFromPath(path) {
+    const file = path.split('/').pop();
+    const slug = file.replace(/-[abc]\.jpg$/, '');
+    return slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  function renderGallery(comboSets) {
+    document.getElementById('status').hidden = true;
+    const galleryEl = document.getElementById('gallery');
+    comboSets.forEach((set) => {
+      const card = document.createElement('div');
+      card.className = 'theme-card';
+      card.innerHTML = `
+        <div class="theme-name">${themeNameFromPath(set.a.img)}</div>
+        <div class="triad">
+          <div class="item">
+            <img src="${set.a.img}" alt="${set.a.name}" loading="lazy">
+            <div class="item-label">${set.a.name}</div>
+          </div>
+          <div class="item">
+            <img src="${set.b.img}" alt="${set.b.name}" loading="lazy">
+            <div class="item-label">${set.b.name}</div>
+          </div>
+          <div class="item result">
+            <img src="${set.c.img}" alt="${set.c.name}" loading="lazy">
+            <div class="item-label">${set.c.name}</div>
+          </div>
+        </div>
+      `;
+      galleryEl.appendChild(card);
+    });
+    const countEl = document.getElementById('count');
+    countEl.textContent = comboSets.length + ' combo ' + (comboSets.length === 1 ? 'theme' : 'themes') + ' · ' + (comboSets.length * 3) + ' images';
+    countEl.hidden = false;
+  }
+</script>
+</body>
+</html>

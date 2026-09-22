@@ -1758,6 +1758,19 @@
     `;
     miniGamesTile.addEventListener('click', goToMiniGames);
     deckGridEl.appendChild(miniGamesTile);
+
+    const galleryTile = document.createElement('button');
+    galleryTile.className = 'deck-tile';
+    galleryTile.style.borderColor = '#8b93a5';
+    galleryTile.innerHTML = `
+      <div class="deck-icon">\u{1F5BC}\u{FE0F}</div>
+      <div class="deck-info">
+        <div class="deck-name">Art Gallery</div>
+        <div class="deck-tagline">Browse every combo item's artwork</div>
+      </div>
+    `;
+    galleryTile.addEventListener('click', () => { window.location.href = 'gallery.html'; });
+    deckGridEl.appendChild(galleryTile);
   }
 
   function goHome() {
