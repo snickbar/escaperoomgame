@@ -1230,14 +1230,6 @@
     return Array.from({ length: count }, (_, i) => i + 1);
   }
 
-  // `count` unique numbers drawn from 1..max, already in random order —
-  // used by Story Mode so card values (and their table position) never
-  // just count upward.
-  function randomNumbers(count, max) {
-    const pool = Array.from({ length: max }, (_, i) => i + 1);
-    return shuffle(pool).slice(0, count);
-  }
-
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
@@ -1268,11 +1260,21 @@
     } catch (e) {}
   }
 
-  const NUMBER_WORDS = [
+  // Covers any 0-99 target (Easy/Medium only ever use 1-20, but Story Mode
+  // puzzle cards can target any two-digit number). No hyphens — the cipher
+  // shift only special-cases spaces, so "TWENTY-ONE" would corrupt.
+  const ONES_WORDS = [
     'ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE', 'TEN',
-    'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN',
-    'NINETEEN', 'TWENTY',
+    'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN',
   ];
+  const TENS_WORDS = ['', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY', 'SIXTY', 'SEVENTY', 'EIGHTY', 'NINETY'];
+
+  function numberToWords(n) {
+    if (n < 20) return ONES_WORDS[n];
+    const tens = Math.floor(n / 10);
+    const ones = n % 10;
+    return ones === 0 ? TENS_WORDS[tens] : TENS_WORDS[tens] + ' ' + ONES_WORDS[ones];
+  }
 
   const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
   const EXTRA_KEYBOARD_LETTERS = 8;
@@ -1295,7 +1297,7 @@
   function makeCipherPuzzle(target) {
     const shift = 1 + Math.floor(Math.random() * 5);
     const template = CIPHER_TEMPLATES[Math.floor(Math.random() * CIPHER_TEMPLATES.length)];
-    const phrase = template(NUMBER_WORDS[target]);
+    const phrase = template(numberToWords(target));
     const ciphertext = phrase.split('').map((ch) => {
       if (ch === ' ') return ' ';
       const code = ch.charCodeAt(0) - 65;
@@ -1862,20 +1864,49 @@
     return 'Flip over cards ' + nums.join(' and ') + '!';
   }
 
-  function buildStoryCardContent(numbers, usedCount) {
+  // Assigns every graph node a real card number, and returns every number
+  // used on the table (graph nodes + traps) for the caller to render.
+  //
+  // Combo numbers are a genuine sum of their two ingredient numbers — like
+  // Hard Mode, the player computes it themselves — so ingredients get
+  // handed out from a reserved, provably collision-free scheme instead of
+  // plain random draws:
+  //   - The top `2 * comboCount` values of 1..NUMBER_MAX are reserved for
+  //     ingredients, laid out as consecutive pairs (base+1,base+2),
+  //     (base+3,base+4), ... — so combo i's sum is always exactly 4 more
+  //     than combo i-1's, guaranteeing every combo's sum is distinct.
+  //   - The smallest possible sum is still greater than NUMBER_MAX, so a
+  //     combo's sum can never collide with any non-combo card's number.
+  //   - Which combo gets which pair (and which ingredient gets the lower
+  //     vs. higher half) is still randomized per game.
+  //   - Everything else (root/story/puzzle/win + traps) draws from
+  //     whatever's left of 1..base.
+  function buildStoryCardContent(tableSize, usedCount) {
     cardContent.clear();
-    const usedNumbers = numbers.slice(0, usedCount);
-    const trapNumbers = numbers.slice(usedCount);
 
     const nodes = buildStoryGraph(usedCount);
+    const comboNodes = nodes.filter((n) => n.kind === 'combo');
+    const otherNodes = nodes.filter((n) => n.kind !== 'combo' && n.kind !== 'object');
+    const base = STORY_MODE_NUMBER_MAX - comboNodes.length * 2;
+
     const numberForId = {};
-    // Shuffle again before assigning: node ids are handed out in graph
-    // creation order (root=0, its earliest children next, ...), and the
-    // table is rendered in numeric order — without this, the root and its
-    // first branches would always land on the smallest numbers and always
-    // land in the same relative reading position.
-    const shuffledUsedNumbers = shuffle(usedNumbers);
-    nodes.forEach((n) => { numberForId[n.id] = shuffledUsedNumbers[n.id]; });
+    const pairOrder = shuffle(comboNodes.map((_, i) => i));
+    comboNodes.forEach((combo, i) => {
+      const slot = pairOrder[i];
+      const a = base + 1 + slot * 2;
+      const b = a + 1;
+      const [aId, bId] = combo.requires;
+      if (Math.random() < 0.5) { numberForId[aId] = a; numberForId[bId] = b; }
+      else { numberForId[aId] = b; numberForId[bId] = a; }
+      numberForId[combo.id] = a + b;
+    });
+
+    const lowPool = shuffle(Array.from({ length: base }, (_, i) => i + 1));
+    let lowIdx = 0;
+    otherNodes.forEach((n) => { numberForId[n.id] = lowPool[lowIdx++]; });
+    const trapCount = tableSize - usedCount;
+    const trapNumbers = lowPool.slice(lowIdx, lowIdx + trapCount);
+
     const itemForId = assignStoryItems(nodes);
 
     nodes.forEach((n) => {
@@ -1923,6 +1954,8 @@
     const rootNumber = numberForId[rootNode.id];
     flippedNumbers = new Set([rootNumber]);
     unlockedNumbers = new Set(cardContent.get(rootNumber).unlocks);
+
+    return nodes.map((n) => numberForId[n.id]).concat(trapNumbers);
   }
 
   // Marks a Story Mode card as flipped, applies whatever it explicitly
@@ -1965,8 +1998,7 @@
       const tableSize = randomInt(STORY_MODE_TABLE_SIZE_MIN, STORY_MODE_TABLE_SIZE_MAX);
       const usedRatio = STORY_MODE_USED_RATIO_MIN + Math.random() * (STORY_MODE_USED_RATIO_MAX - STORY_MODE_USED_RATIO_MIN);
       const usedCount = Math.round(tableSize * usedRatio);
-      numbers = randomNumbers(tableSize, STORY_MODE_NUMBER_MAX);
-      buildStoryCardContent(numbers, usedCount);
+      numbers = buildStoryCardContent(tableSize, usedCount);
       // Card values stay random, but lay the table out in ascending order
       // so a "flip over card 47" hint is easy to scan for instead of a hunt.
       numbers = numbers.slice().sort((a, b) => a - b);
