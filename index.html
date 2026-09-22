@@ -1901,6 +1901,11 @@
         // No "combine with ___" pointer — the player has to notice the
         // pairing themselves from the artwork.
         hint = '';
+      } else if (n.kind === 'combo') {
+        // The payoff card: confirms what got made and, like a story card,
+        // still has to say what to flip next — losing this was the bug.
+        message = '✓ You made the ' + (backItem ? backItem.name : 'item') + '!';
+        hint = describeUnlocks(unlockNums);
       } else {
         hint = describeUnlocks(unlockNums);
       }
@@ -1978,15 +1983,16 @@
       card.dataset.number = num;
 
       const hasArt = !!content.backItem;
+      const isCombo = !!content.requires;
       const iconInner = hasArt ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
-      // Only the story intro and the win card carry real flavor text — the
-      // generic "Nicely done!" / "Item found!" line on every other card was
-      // just clutter that pushed the hint off the bottom of the card, so a
-      // correct guess is now shown with a sound + checkmark animation instead.
-      const messageInner = (content.isStory || content.isWin) ? `<div class="message">${content.message}</div>` : '';
-      // Item cards are just the picture — no hint text competing for room;
-      // tap the flipped card to see what it unlocks in the zoom view instead.
-      const hintInner = hasArt ? '' : `<div class="hint">${content.hint}</div>`;
+      // Only the story intro, the win card, and a combo's "you made it!"
+      // line carry real flavor text — the generic "Nicely done!" on every
+      // other card was just clutter that pushed the hint off the card.
+      const messageInner = (content.isStory || content.isWin || isCombo) ? `<div class="message">${content.message}</div>` : '';
+      // Ingredient (object) cards are just the picture with no hint text —
+      // the player has to notice the pairing themselves. Everything else,
+      // including a combo's own "flip over card X" payoff, still needs it.
+      const hintInner = (hasArt && !isCombo) ? '' : `<div class="hint">${content.hint}</div>`;
 
       card.innerHTML = `
         <div class="card-inner">
