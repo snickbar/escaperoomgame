@@ -124,6 +124,24 @@
     padding: 6px 10px;
   }
 
+  .debug-next-btn {
+    display: block;
+    margin: 0 auto 16px;
+    background: none;
+    border: 1px dashed #5a6072;
+    border-radius: 8px;
+    color: #7a8194;
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 5px 10px;
+  }
+
+  .debug-next-btn:hover {
+    color: #cfd3dc;
+    border-color: #7a8194;
+  }
+
   .home-link:hover {
     color: #cfd3dc;
   }
@@ -991,6 +1009,7 @@
 
 <div id="gameScreen" hidden>
   <button class="home-link" id="homeLink">&larr; Back to decks</button>
+  <button class="debug-next-btn" id="debugNextBtn">&#128269; Debug: next card</button>
   <h1 id="gameTitle">Escape Room Card Game</h1>
 
   <div class="lives" id="livesDisplay"></div>
@@ -1349,6 +1368,7 @@
   const gameScreenEl = document.getElementById('gameScreen');
   const gameTitleEl = document.getElementById('gameTitle');
   const homeLinkEl = document.getElementById('homeLink');
+  const debugNextBtnEl = document.getElementById('debugNextBtn');
 
   const miniGamesScreenEl = document.getElementById('miniGamesScreen');
   const miniGamesGridEl = document.getElementById('miniGamesGrid');
@@ -1506,14 +1526,30 @@
   }
 
   let toastTimeout;
-  function showToast(message) {
+  function showToast(message, duration) {
     toastEl.textContent = message;
     toastEl.classList.add('show');
     clearTimeout(toastTimeout);
     toastTimeout = setTimeout(() => {
       toastEl.classList.remove('show');
-    }, 1800);
+    }, duration || 1800);
   }
+
+  // Dev/QA aid: shows exactly what the game currently considers a correct
+  // flip, so a report like "I couldn't find the card I needed" can be
+  // checked against the actual state instead of guessed at.
+  debugNextBtnEl.addEventListener('click', () => {
+    if (!currentMode) {
+      showToast('Deal a deck first.');
+      return;
+    }
+    if (currentMode === 'story') {
+      const nums = Array.from(unlockedNumbers).sort((a, b) => a - b);
+      showToast(nums.length ? ('Unlocked now: ' + nums.join(', ')) : 'Nothing unlocked yet — deal the deck.', 4000);
+    } else {
+      showToast(currentTarget != null ? ('Next card: ' + currentTarget) : 'No target — deal the deck or you already won.', 4000);
+    }
+  });
 
   function triggerWrongFeedback(card) {
     card.classList.remove('wrong');
