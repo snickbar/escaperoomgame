@@ -285,6 +285,45 @@
     100% { opacity: 1; transform: scale(1); }
   }
 
+  .card.correct {
+    animation: correctRing 0.6s ease;
+    border-radius: 10px;
+  }
+
+  @keyframes correctRing {
+    0% { box-shadow: 0 0 0 0 rgba(126, 230, 168, 0.7); }
+    60% { box-shadow: 0 0 0 12px rgba(126, 230, 168, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(126, 230, 168, 0); }
+  }
+
+  .correct-mark {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 56px;
+    font-weight: 800;
+    color: #7ee6a8;
+    text-shadow: 0 0 14px rgba(126, 230, 168, 0.85);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5;
+    transition: opacity 0.2s ease;
+  }
+
+  .card.correct .correct-mark {
+    opacity: 1;
+    animation: correctPop 0.6s ease;
+  }
+
+  @keyframes correctPop {
+    0% { opacity: 0; transform: scale(0.4); }
+    35% { opacity: 1; transform: scale(1.25); }
+    60% { transform: scale(1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
   .card-inner {
     position: relative;
     width: 100%;
@@ -310,6 +349,7 @@
     padding: 10px;
     box-sizing: border-box;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
   }
 
   .card-back {
@@ -1410,6 +1450,43 @@
     }, 900);
   }
 
+  function triggerCorrectFeedback(card) {
+    card.classList.remove('correct');
+    void card.offsetWidth;
+    card.classList.add('correct');
+    clearTimeout(card._correctTimeout);
+    card._correctTimeout = setTimeout(() => {
+      card.classList.remove('correct');
+    }, 900);
+  }
+
+  let audioCtx = null;
+  function playCorrectSound() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const now = audioCtx.currentTime;
+      // A quick two-note ascending "ding" — no audio asset needed.
+      [523.25, 783.99].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        const start = now + i * 0.08;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(0.25, start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(start);
+        osc.stop(start + 0.24);
+      });
+    } catch (e) {
+      // Audio is a nice-to-have; never let it break the game.
+    }
+  }
+
   function loseLife() {
     lives--;
     mistakes++;
@@ -1581,6 +1658,11 @@
       card.dataset.number = num;
 
       const iconInner = content.backItem ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
+      // Only the story intro and the win card carry real flavor text — the
+      // generic "Nicely done!" / "Item found!" line on every other card was
+      // just clutter that pushed the hint off the bottom of the card, so a
+      // correct guess is now shown with a sound + checkmark animation instead.
+      const messageInner = (content.isStory || content.isWin) ? `<div class="message">${content.message}</div>` : '';
 
       card.innerHTML = `
         <div class="card-inner">
@@ -1590,11 +1672,12 @@
           <div class="card-face card-front${content.isStory ? ' story' : content.isWin ? ' win' : ''}">
             <div class="front-number">#${num}</div>
             ${iconInner}
-            <div class="message">${content.message}</div>
+            ${messageInner}
             <div class="hint">${content.hint}</div>
           </div>
         </div>
         <div class="wrong-mark">&#10005;</div>
+        <div class="correct-mark">&#10003;</div>
       `;
 
       card.addEventListener('click', () => {
@@ -1607,6 +1690,8 @@
           loseLife();
           return;
         }
+        triggerCorrectFeedback(card);
+        playCorrectSound();
         card.classList.add('flipped');
         currentTarget = content.next;
         if (content.isWin) {
