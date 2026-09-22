@@ -863,6 +863,38 @@
     background: rgba(255, 255, 255, 0.18);
   }
 
+  .puzzle-hint {
+    border: 1px solid rgba(255, 193, 7, 0.5);
+    border-radius: 8px;
+    background: rgba(255, 193, 7, 0.12);
+    color: #ffc107;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .puzzle-hint:hover:not(:disabled) {
+    background: rgba(255, 193, 7, 0.22);
+  }
+
+  .puzzle-hint:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  /* A hint-revealed tile/letter pulses gold until the player's next move,
+     so it's obvious what just changed without permanently marking it. */
+  @keyframes hintPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.75); }
+    50% { box-shadow: 0 0 0 7px rgba(255, 193, 7, 0.15); }
+  }
+
+  .hinted {
+    animation: hintPulse 1s ease-in-out infinite;
+  }
+
   .puzzle-reveal-toggle {
     border: none;
     background: none;
@@ -1139,6 +1171,7 @@
       <div class="cipher-keyboard" id="cipherKeyboard"></div>
       <div class="slider-grid" id="sliderGrid" hidden></div>
       <div class="swap-grid" id="swapGrid" hidden></div>
+      <button class="puzzle-hint" id="puzzleHint">&#128161; Hint (2)</button>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
       <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
@@ -1173,7 +1206,8 @@
 <script>
   const CARD_COUNT = 20;
   const STORY_NUMBER = 1;
-  const MAX_LIVES = 3;
+  const MAX_LIVES = 2;
+  const PUZZLE_HINT_COUNT = 2;
   const TRAP_COUNT = 6;
   const CHAIN_LENGTH = CARD_COUNT - TRAP_COUNT;
   const PROGRESS_KEY = 'escapeRoomProgress';
@@ -1479,6 +1513,7 @@
       solved: false,
       guesses: new Array(ciphertext.length).fill(null),
       keyboard,
+      hintsRemaining: PUZZLE_HINT_COUNT,
       reveal: phrase + ' (' + target + ')',
     };
   }
@@ -1529,6 +1564,7 @@
       guesses,
       keyboard,
       numberForLetter,
+      hintsRemaining: PUZZLE_HINT_COUNT,
       reveal: phrase + ' (' + target + ')',
     };
   }
@@ -1606,6 +1642,7 @@
       tiles,
       answer: target,
       solved: false,
+      hintsRemaining: PUZZLE_HINT_COUNT,
       reveal: 'Flip over card ' + target + '!',
     };
   }
@@ -1705,6 +1742,7 @@
   const swapGridEl = document.getElementById('swapGrid');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
+  const puzzleHintEl = document.getElementById('puzzleHint');
   const puzzleAgainEl = document.getElementById('puzzleAgain');
   const puzzleRevealToggleEl = document.getElementById('puzzleRevealToggle');
   const puzzleRevealEl = document.getElementById('puzzleReveal');
@@ -2517,7 +2555,12 @@
       puzzleRevealEl.textContent = 'Decoded: ' + p.reveal;
     };
 
+    puzzleHintEl.hidden = false;
+    updateHintButton();
+    puzzleHintEl.onclick = useHint;
+
     let activeIndex = -1;
+    let hintedIndices = new Set();
     for (let i = 0; i < p.ciphertext.length; i++) {
       if (p.ciphertext[i] !== ' ' && !p.guesses[i]) {
         activeIndex = i;
@@ -2541,8 +2584,44 @@
       activeIndex = -1;
     }
 
+    function updateHintButton() {
+      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
+    }
+
+    // Reveals one whole letter (every instance, same as a normal correct
+    // guess) — prefers a letter that's still fully blank; if every letter
+    // has at least been attempted, fixes one that's currently wrong.
+    function useHint() {
+      if (p.solved || p.hintsRemaining <= 0) return;
+      const blankLetters = p.keyboard.filter((l) =>
+        p.ciphertext.split('').some((ch, i) => ch === l && !p.guesses[i]));
+      const wrongLetters = p.keyboard.filter((l) =>
+        p.ciphertext.split('').some((ch, i) => ch === l && p.guesses[i] && p.guesses[i] !== p.plaintext[i]));
+      const candidates = blankLetters.length ? blankLetters : wrongLetters;
+      if (!candidates.length) return;
+      const letter = pickRandom(candidates);
+      const revealed = [];
+      for (let i = 0; i < p.ciphertext.length; i++) {
+        if (p.ciphertext[i] === letter) {
+          p.guesses[i] = p.plaintext[i];
+          revealed.push(i);
+        }
+      }
+      p.hintsRemaining--;
+      hintedIndices = new Set(revealed);
+      // Only move off the active blank if the hint just filled it.
+      if (activeIndex === -1 || p.guesses[activeIndex]) advanceActive();
+      renderGrid();
+      renderKeyboard();
+      updateHintButton();
+      checkComplete();
+    }
+
     function solvePuzzle() {
       p.solved = true;
+      hintedIndices = new Set();
+      updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
       if (isTest) {
         puzzleFeedbackEl.textContent = '✓ Solved! ' + p.plaintext + ' (' + p.answer + ')';
@@ -2602,6 +2681,7 @@
         const guess = p.guesses[i];
         const isCorrect = guess && guess === p.plaintext[i];
         const isWrong = guess && guess !== p.plaintext[i];
+        const isHinted = hintedIndices.has(i);
 
         // For the cryptogram, showing ch (the real letter) would give away
         // the answer, so it shows the letter's assigned number instead —
@@ -2614,10 +2694,11 @@
         unit.className = 'cipher-letter';
         unit.innerHTML = `
           ${cipherCharInner}
-          <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}">${guess || '_'}</div>
+          <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}${isHinted ? ' hinted' : ''}">${guess || '_'}</div>
         `;
         unit.querySelector('.cipher-blank').addEventListener('click', () => {
           activeIndex = i;
+          hintedIndices = new Set();
           renderGrid();
         });
         wordEl.appendChild(unit);
@@ -2641,6 +2722,7 @@
           if (activeIndex === -1 || p.solved || isUsed) return;
           applyGuess(activeIndex, letter);
           advanceActive();
+          hintedIndices = new Set();
           renderGrid();
           renderKeyboard();
           checkComplete();
@@ -2664,6 +2746,7 @@
             }
           }
         }
+        hintedIndices = new Set();
         renderGrid();
         renderKeyboard();
         puzzleFeedbackEl.textContent = '';
@@ -2694,6 +2777,8 @@
       'tile next to the empty space to move it there.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
+    // Not implemented for this puzzle type yet (it's not in regular play).
+    puzzleHintEl.hidden = true;
     puzzleAgainEl.hidden = true;
     puzzleRevealEl.hidden = true;
     puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
@@ -2784,10 +2869,46 @@
       puzzleRevealEl.textContent = p.reveal;
     };
 
+    puzzleHintEl.hidden = false;
+    updateHintButton();
+    puzzleHintEl.onclick = useHint;
+
     let selectedIdx = -1;
+    let hintedIndices = new Set();
+
+    function updateHintButton() {
+      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
+    }
+
+    // Picks a tile that's not yet in its correct spot and swaps it with
+    // whatever tile currently sits where it belongs — usually corrects two
+    // tiles for the price of one hint.
+    function useHint() {
+      if (p.solved || p.hintsRemaining <= 0) return;
+      const wrongIndices = [];
+      for (let i = 0; i < p.tiles.length; i++) {
+        if (p.tiles[i] !== solved[i]) wrongIndices.push(i);
+      }
+      if (!wrongIndices.length) return;
+      const i = pickRandom(wrongIndices);
+      const j = p.tiles.indexOf(solved[i]);
+      [p.tiles[i], p.tiles[j]] = [p.tiles[j], p.tiles[i]];
+      p.hintsRemaining--;
+      hintedIndices = new Set([i, j]);
+      selectedIdx = -1;
+      renderTiles();
+      updateHintButton();
+      if (p.tiles.every((v, idx) => v === solved[idx])) {
+        solvePuzzle();
+        renderTiles();
+      }
+    }
 
     function solvePuzzle() {
       p.solved = true;
+      hintedIndices = new Set();
+      updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
       if (isTest) {
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
@@ -2811,11 +2932,12 @@
         const tile = document.createElement('button');
         const isCorrect = value === solved[i];
         tile.className = 'swap-tile' + (i === selectedIdx ? ' selected' : '') +
-          (isCorrect ? ' correct' : '');
+          (isCorrect ? ' correct' : '') + (hintedIndices.has(i) ? ' hinted' : '');
         tile.textContent = String(value);
         tile.disabled = p.solved;
         tile.addEventListener('click', () => {
           if (p.solved) return;
+          hintedIndices = new Set();
           if (selectedIdx === -1) {
             selectedIdx = i;
           } else if (selectedIdx === i) {
