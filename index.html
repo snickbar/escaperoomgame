@@ -786,6 +786,43 @@
     visibility: hidden;
   }
 
+  /* --- Swap puzzle --- */
+
+  .swap-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 46px);
+    grid-template-rows: repeat(4, 46px);
+    gap: 5px;
+    justify-content: center;
+  }
+
+  .swap-tile {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #d8f5e6;
+    font-size: 17px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .swap-tile:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .swap-tile.selected {
+    background: rgba(76, 175, 125, 0.4);
+    box-shadow: 0 0 0 2px #4caf7d inset;
+  }
+
+  .swap-tile.correct {
+    background: rgba(76, 175, 125, 0.18);
+    color: #7ee6a8;
+  }
+
   .puzzle-feedback {
     font-size: 13px;
     font-weight: 600;
@@ -1091,6 +1128,7 @@
       <div class="cipher-grid" id="cipherGrid"></div>
       <div class="cipher-keyboard" id="cipherKeyboard"></div>
       <div class="slider-grid" id="sliderGrid" hidden></div>
+      <div class="swap-grid" id="swapGrid" hidden></div>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
       <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
@@ -1238,8 +1276,15 @@
       id: 'slider',
       label: 'Slide Puzzle',
       icon: '\u{1F532}',
-      tagline: 'Slide the tiles into order to reveal a number',
+      tagline: 'Slide the tiles into order to reveal a number (not in regular play yet)',
       accent: '#4c9df0',
+    },
+    swap: {
+      id: 'swap',
+      label: 'Number Swap',
+      icon: '\u{1F522}',
+      tagline: 'Tap two tiles to swap them into order',
+      accent: '#e0a34c',
     },
   };
 
@@ -1473,10 +1518,35 @@
     };
   }
 
+  // --- Swap puzzle: tap any two tiles to swap them, no adjacency needed ---
+  // (the sliding puzzle above is kept around and still playable from
+  // Mini-Games, but felt too hard for regular play — every tile is free to
+  // swap with any other here, and the grid is a size bigger to compensate
+  // for how much easier that makes it: 4x4 numbered 1-16, no blank.)
+
+  const SWAP_SIZE = 4;
+
+  function makeSwapPuzzle(target) {
+    const solved = Array.from({ length: SWAP_SIZE * SWAP_SIZE }, (_, i) => i + 1);
+    let tiles = shuffle(solved);
+    let guard = 0;
+    while (tiles.every((v, i) => v === solved[i]) && guard < 5) {
+      tiles = shuffle(solved);
+      guard++;
+    }
+    return {
+      type: 'swap',
+      tiles,
+      answer: target,
+      solved: false,
+      reveal: 'Flip over card ' + target + '!',
+    };
+  }
+
   // Story Mode picks one of these at random for each puzzle card.
   const PUZZLE_GENERATORS = [
     { make: makeCipherPuzzle, hint: '\u{1F510} Solve the cipher to find your next card!' },
-    { make: makeSliderPuzzle, hint: '\u{1F532} Solve the slide puzzle to find your next card!' },
+    { make: makeSwapPuzzle, hint: '\u{1F522} Solve the number puzzle to find your next card!' },
   ];
 
   function mediumHintText(target) {
@@ -1565,6 +1635,7 @@
   const cipherGridEl = document.getElementById('cipherGrid');
   const cipherKeyboardEl = document.getElementById('cipherKeyboard');
   const sliderGridEl = document.getElementById('sliderGrid');
+  const swapGridEl = document.getElementById('swapGrid');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleAgainEl = document.getElementById('puzzleAgain');
@@ -2331,6 +2402,8 @@
   function renderPuzzle(content, num, opts) {
     if (content.puzzle.type === 'slider') {
       renderSliderPuzzle(content, num, opts);
+    } else if (content.puzzle.type === 'swap') {
+      renderSwapPuzzle(content, num, opts);
     } else {
       renderCipherPuzzle(content, num, opts);
     }
@@ -2344,6 +2417,7 @@
     cipherGridEl.hidden = false;
     cipherKeyboardEl.hidden = false;
     sliderGridEl.hidden = true;
+    swapGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Each letter is shifted forward by ' + p.shift +
       ' in the alphabet. Tap a blank, then tap a letter — matching letters fill in too.';
@@ -2516,6 +2590,7 @@
     cipherGridEl.hidden = true;
     cipherKeyboardEl.hidden = true;
     sliderGridEl.hidden = false;
+    swapGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Slide the tiles into order, 1 through 8. Tap any ' +
       'tile next to the empty space to move it there.';
@@ -2584,17 +2659,102 @@
     };
   }
 
+  function renderSwapPuzzle(content, num, opts) {
+    opts = opts || {};
+    const isTest = !!opts.isTest;
+    const p = content.puzzle;
+    const solved = Array.from({ length: SWAP_SIZE * SWAP_SIZE }, (_, i) => i + 1);
+
+    cipherGridEl.hidden = true;
+    cipherKeyboardEl.hidden = true;
+    sliderGridEl.hidden = true;
+    swapGridEl.hidden = false;
+
+    puzzleInstructionsEl.textContent = 'Tap a tile, then tap another to swap them. ' +
+      'Arrange 1 through 16 in order to solve it.';
+    puzzleFeedbackEl.textContent = '';
+    puzzleFeedbackEl.className = 'puzzle-feedback';
+    puzzleAgainEl.hidden = true;
+    puzzleRevealEl.hidden = true;
+    puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
+    puzzleRevealToggleEl.onclick = () => {
+      const showing = !puzzleRevealEl.hidden;
+      puzzleRevealEl.hidden = showing;
+      puzzleRevealToggleEl.textContent = showing
+        ? '\u{1F50D} Show Answer (dev)'
+        : '\u{1F648} Hide Answer';
+      puzzleRevealEl.textContent = p.reveal;
+    };
+
+    let selectedIdx = -1;
+
+    function solvePuzzle() {
+      p.solved = true;
+      puzzleFeedbackEl.className = 'puzzle-feedback correct';
+      if (isTest) {
+        puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
+        puzzleAgainEl.hidden = false;
+      } else {
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      }
+    }
+
+    function renderTiles() {
+      swapGridEl.innerHTML = '';
+      p.tiles.forEach((value, i) => {
+        const tile = document.createElement('button');
+        const isCorrect = value === solved[i];
+        tile.className = 'swap-tile' + (i === selectedIdx ? ' selected' : '') +
+          (isCorrect ? ' correct' : '');
+        tile.textContent = String(value);
+        tile.disabled = p.solved;
+        tile.addEventListener('click', () => {
+          if (p.solved) return;
+          if (selectedIdx === -1) {
+            selectedIdx = i;
+          } else if (selectedIdx === i) {
+            selectedIdx = -1;
+          } else {
+            [p.tiles[selectedIdx], p.tiles[i]] = [p.tiles[i], p.tiles[selectedIdx]];
+            selectedIdx = -1;
+          }
+          renderTiles();
+          if (p.tiles.every((v, idx) => v === solved[idx])) {
+            solvePuzzle();
+            renderTiles();
+          }
+        });
+        swapGridEl.appendChild(tile);
+      });
+    }
+
+    renderTiles();
+
+    puzzleAgainEl.onclick = () => {
+      if (opts.onRetry) opts.onRetry();
+    };
+  }
+
   function openTestPuzzle(type) {
     const game = MINI_GAMES[type];
     let content = null;
 
-    if (type === 'cipher' || type === 'slider') {
+    if (type === 'cipher' || type === 'slider' || type === 'swap') {
       const target = 1 + Math.floor(Math.random() * CARD_COUNT);
+      const makers = { cipher: makeCipherPuzzle, slider: makeSliderPuzzle, swap: makeSwapPuzzle };
       content = {
         isStory: false,
         isWin: false,
         message: '\u{1F9EA} ' + game.label + ' — Test Mode',
-        puzzle: type === 'cipher' ? makeCipherPuzzle(target) : makeSliderPuzzle(target),
+        puzzle: makers[type](target),
         backItem: null,
       };
     }
