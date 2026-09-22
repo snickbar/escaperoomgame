@@ -386,6 +386,28 @@
     line-height: 1;
   }
 
+  /* Item cards (object/combo art): the picture is the card — it fills
+     almost all the space below the small number, with no competing text. */
+  .card-front.has-art {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .card-front.has-art .front-icon {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+  }
+
+  .card-front.has-art .front-icon .item-art {
+    width: 100%;
+    height: 100%;
+  }
+
   .item-art {
     display: inline-block;
     height: 58px;
@@ -522,10 +544,19 @@
     color: #9fd6b8;
   }
 
-  .zoom-number .item-art {
-    height: 22px;
-    border-radius: 4px;
-    margin: 0 2px -6px;
+  .zoom-item-art {
+    width: 100%;
+    max-width: 260px;
+    aspect-ratio: 385 / 507;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .zoom-item-art .item-art {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
     box-shadow: none;
   }
 
@@ -988,6 +1019,7 @@
   <div class="zoom-card" id="zoomCard">
     <button class="zoom-close" id="zoomClose" aria-label="Close">&times;</button>
     <div class="zoom-number" id="zoomNumber"></div>
+    <div class="zoom-item-art" id="zoomItemArt" hidden></div>
     <div class="zoom-message" id="zoomMessage"></div>
     <div class="zoom-hint" id="zoomHint"></div>
     <div class="zoom-puzzle" id="zoomPuzzle" hidden>
@@ -1344,6 +1376,7 @@
   const zoomOverlay = document.getElementById('zoomOverlay');
   const zoomCardEl = document.getElementById('zoomCard');
   const zoomNumberEl = document.getElementById('zoomNumber');
+  const zoomItemArtEl = document.getElementById('zoomItemArt');
   const zoomMessageEl = document.getElementById('zoomMessage');
   const zoomHintEl = document.getElementById('zoomHint');
   const zoomCloseEl = document.getElementById('zoomClose');
@@ -1800,14 +1833,14 @@
 
     const nodes = buildStoryGraph(usedCount);
     const numberForId = {};
-    nodes.forEach((n) => { numberForId[n.id] = usedNumbers[n.id]; });
+    // Shuffle again before assigning: node ids are handed out in graph
+    // creation order (root=0, its earliest children next, ...), and the
+    // table is rendered in numeric order — without this, the root and its
+    // first branches would always land on the smallest numbers and always
+    // land in the same relative reading position.
+    const shuffledUsedNumbers = shuffle(usedNumbers);
+    nodes.forEach((n) => { numberForId[n.id] = shuffledUsedNumbers[n.id]; });
     const itemForId = assignStoryItems(nodes);
-
-    // Each object's combo (for the "combine with ___" hint on its card).
-    const comboForObjectId = {};
-    nodes.forEach((n) => {
-      if (n.kind === 'combo') n.requires.forEach((id) => { comboForObjectId[id] = n; });
-    });
 
     nodes.forEach((n) => {
       const num = numberForId[n.id];
@@ -1829,10 +1862,9 @@
         puzzle = makeCipherPuzzle(unlockNums[0]);
         hint = '\u{1F510} Solve the cipher to find your next card!';
       } else if (n.kind === 'object') {
-        const combo = comboForObjectId[n.id];
-        const partnerId = combo ? combo.requires.find((id) => id !== n.id) : null;
-        const partnerItem = partnerId != null ? itemForId[partnerId] : null;
-        hint = partnerItem ? ('Combine with ' + itemVisual(partnerItem) + ' ' + partnerItem.name + '!') : '';
+        // No "combine with ___" pointer — the player has to notice the
+        // pairing themselves from the artwork.
+        hint = '';
       } else {
         hint = describeUnlocks(unlockNums);
       }
@@ -1894,6 +1926,9 @@
       const usedCount = Math.round(tableSize * usedRatio);
       numbers = randomNumbers(tableSize, STORY_MODE_NUMBER_MAX);
       buildStoryCardContent(numbers, usedCount);
+      // Card values stay random, but lay the table out in ascending order
+      // so a "flip over card 47" hint is easy to scan for instead of a hunt.
+      numbers = numbers.slice().sort((a, b) => a - b);
     } else {
       numbers = orderedNumbers(CARD_COUNT);
       buildCardContent(currentMode, numbers);
@@ -1906,23 +1941,27 @@
       card.style.animationDelay = (index * 0.06) + 's';
       card.dataset.number = num;
 
-      const iconInner = content.backItem ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
+      const hasArt = !!content.backItem;
+      const iconInner = hasArt ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
       // Only the story intro and the win card carry real flavor text — the
       // generic "Nicely done!" / "Item found!" line on every other card was
       // just clutter that pushed the hint off the bottom of the card, so a
       // correct guess is now shown with a sound + checkmark animation instead.
       const messageInner = (content.isStory || content.isWin) ? `<div class="message">${content.message}</div>` : '';
+      // Item cards are just the picture — no hint text competing for room;
+      // tap the flipped card to see what it unlocks in the zoom view instead.
+      const hintInner = hasArt ? '' : `<div class="hint">${content.hint}</div>`;
 
       card.innerHTML = `
         <div class="card-inner">
           <div class="card-face card-back">
             <div class="card-number">${num}</div>
           </div>
-          <div class="card-face card-front${content.isStory ? ' story' : content.isWin ? ' win' : ''}">
+          <div class="card-face card-front${content.isStory ? ' story' : content.isWin ? ' win' : ''}${hasArt ? ' has-art' : ''}">
             <div class="front-number">#${num}</div>
             ${iconInner}
             ${messageInner}
-            <div class="hint">${content.hint}</div>
+            ${hintInner}
           </div>
         </div>
         <div class="wrong-mark">&#10005;</div>
@@ -2010,8 +2049,14 @@
     const content = cardContent.get(num);
     zoomCardEl.classList.toggle('story', content.isStory);
     zoomCardEl.classList.toggle('win', content.isWin);
-    zoomNumberEl.innerHTML = 'Card ' + num +
-      (content.backItem ? ' — ' + itemVisual(content.backItem) + ' ' + content.backItem.name : '');
+    zoomNumberEl.textContent = 'Card ' + num;
+    if (content.backItem) {
+      zoomItemArtEl.innerHTML = itemVisual(content.backItem);
+      zoomItemArtEl.hidden = false;
+    } else {
+      zoomItemArtEl.hidden = true;
+      zoomItemArtEl.innerHTML = '';
+    }
     zoomMessageEl.textContent = content.message;
 
     const showPuzzle = content.puzzle && !content.puzzle.solved;
@@ -2216,6 +2261,8 @@
     zoomCardEl.classList.remove('story', 'win');
     zoomCardEl.classList.add('has-puzzle');
     zoomNumberEl.textContent = game.label + ' Test';
+    zoomItemArtEl.hidden = true;
+    zoomItemArtEl.innerHTML = '';
     zoomMessageEl.textContent = content.message;
     zoomHintEl.hidden = true;
     zoomPuzzleEl.hidden = false;
