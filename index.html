@@ -346,6 +346,24 @@
     line-height: 1;
   }
 
+  .item-art {
+    display: inline-block;
+    height: 58px;
+    width: auto;
+    aspect-ratio: 385 / 507;
+    object-fit: cover;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    vertical-align: middle;
+  }
+
+  .hint .item-art {
+    height: 18px;
+    border-radius: 3px;
+    margin: 0 2px -4px;
+    box-shadow: none;
+  }
+
   .card-front .message {
     font-size: 14px;
     font-weight: 600;
@@ -462,6 +480,13 @@
   .zoom-hint {
     font-size: 14px;
     color: #9fd6b8;
+  }
+
+  .zoom-number .item-art {
+    height: 22px;
+    border-radius: 4px;
+    margin: 0 2px -6px;
+    box-shadow: none;
   }
 
   .zoom-card.story {
@@ -1026,6 +1051,62 @@
     { emoji: '\u{1F9EA}', name: 'Potion' },
   ];
 
+  // Themed artwork triads: card A + card B combine to make card C.
+  // Used to flesh out some of Hard mode's "add these two items" puzzles
+  // with illustrated cards instead of plain emoji.
+  const COMBO_SETS = [
+    { a: { img: 'art/items/rune-tablet-a.jpg', name: 'Blank Scroll' },
+      b: { img: 'art/items/rune-tablet-b.jpg', name: 'Golden Paint' },
+      c: { img: 'art/items/rune-tablet-c.jpg', name: 'Rune Tablet' } },
+    { a: { img: 'art/items/parrot-cage-a.jpg', name: 'Empty Cage' },
+      b: { img: 'art/items/parrot-cage-b.jpg', name: 'Birdseed' },
+      c: { img: 'art/items/parrot-cage-c.jpg', name: 'Caged Parrot' } },
+    { a: { img: 'art/items/bike-tire-a.jpg', name: 'Flat Tire' },
+      b: { img: 'art/items/bike-tire-b.jpg', name: 'Bike Pump' },
+      c: { img: 'art/items/bike-tire-c.jpg', name: 'Full Tire' } },
+    { a: { img: 'art/items/fish-hook-a.jpg', name: 'Fish Hook' },
+      b: { img: 'art/items/fish-hook-b.jpg', name: 'Fishing Line' },
+      c: { img: 'art/items/fish-hook-c.jpg', name: 'Baited Line' } },
+    { a: { img: 'art/items/old-diary-a.jpg', name: 'Locked Diary' },
+      b: { img: 'art/items/old-diary-b.jpg', name: 'Brass Key' },
+      c: { img: 'art/items/old-diary-c.jpg', name: 'Open Diary' } },
+    { a: { img: 'art/items/flashlight-a.jpg', name: 'Broken Flashlight' },
+      b: { img: 'art/items/flashlight-b.jpg', name: 'Batteries' },
+      c: { img: 'art/items/flashlight-c.jpg', name: 'Lit Flashlight' } },
+    { a: { img: 'art/items/campfire-a.jpg', name: 'Firewood' },
+      b: { img: 'art/items/campfire-b.jpg', name: 'Magnifying Glass' },
+      c: { img: 'art/items/campfire-c.jpg', name: 'Campfire' } },
+    { a: { img: 'art/items/pencil-a.jpg', name: 'Pencil' },
+      b: { img: 'art/items/pencil-b.jpg', name: 'Sharpener' },
+      c: { img: 'art/items/pencil-c.jpg', name: 'Sharp Pencil' } },
+    { a: { img: 'art/items/cut-fence-a.jpg', name: 'Locked Fence' },
+      b: { img: 'art/items/cut-fence-b.jpg', name: 'Bolt Cutters' },
+      c: { img: 'art/items/cut-fence-c.jpg', name: 'Cut Fence' } },
+    { a: { img: 'art/items/rose-a.jpg', name: 'Empty Pot' },
+      b: { img: 'art/items/rose-b.jpg', name: 'Flower Seeds' },
+      c: { img: 'art/items/rose-c.jpg', name: 'Blooming Rose' } },
+    { a: { img: 'art/items/tea-a.jpg', name: 'Empty Mug' },
+      b: { img: 'art/items/tea-b.jpg', name: 'Teapot' },
+      c: { img: 'art/items/tea-c.jpg', name: 'Cup of Tea' } },
+    { a: { img: 'art/items/safe-a.jpg', name: 'Locked Safe' },
+      b: { img: 'art/items/safe-b.jpg', name: 'Code Note' },
+      c: { img: 'art/items/safe-c.jpg', name: 'Open Safe' } },
+    { a: { img: 'art/items/mirror-a.jpg', name: 'Dusty Mirror' },
+      b: { img: 'art/items/mirror-b.jpg', name: 'Cloth' },
+      c: { img: 'art/items/mirror-c.jpg', name: 'Clean Mirror' } },
+    { a: { img: 'art/items/candle-a.jpg', name: 'Candle' },
+      b: { img: 'art/items/candle-b.jpg', name: 'Matches' },
+      c: { img: 'art/items/candle-c.jpg', name: 'Lit Candle' } },
+  ];
+
+  function itemVisual(item) {
+    if (!item) return '';
+    if (item.img) {
+      return '<img class="item-art" src="' + item.img + '" alt="' + item.name + '">';
+    }
+    return item.emoji;
+  }
+
   function orderedNumbers(count) {
     return Array.from({ length: count }, (_, i) => i + 1);
   }
@@ -1404,14 +1485,43 @@
     currentTarget = cardContent.get(STORY_NUMBER).next;
   }
 
+  // Walks the combine chain and hands out items to each card: where two
+  // freshly-unassigned parent cards combine, they get a matching illustrated
+  // "A + B = C" triad; everywhere else falls back to a plain emoji item.
+  function assignHardItems(chain, pairFor) {
+    const itemForNumber = {};
+    const comboPool = shuffle(COMBO_SETS.slice());
+    const emojiPool = shuffle(ITEMS.slice());
+
+    function nextEmoji() {
+      if (emojiPool.length === 0) emojiPool.push(...shuffle(ITEMS.slice()));
+      return emojiPool.pop();
+    }
+
+    for (let i = 2; i < chain.length; i++) {
+      const sum = chain[i];
+      const [a, b] = pairFor[sum];
+      if (!itemForNumber[a] && !itemForNumber[b] && comboPool.length > 0) {
+        const combo = comboPool.pop();
+        itemForNumber[a] = combo.a;
+        itemForNumber[b] = combo.b;
+        itemForNumber[sum] = combo.c;
+      } else {
+        if (!itemForNumber[a]) itemForNumber[a] = nextEmoji();
+        if (!itemForNumber[b]) itemForNumber[b] = nextEmoji();
+        if (!itemForNumber[sum]) itemForNumber[sum] = nextEmoji();
+      }
+    }
+    chain.forEach((num) => {
+      if (!itemForNumber[num]) itemForNumber[num] = nextEmoji();
+    });
+    return itemForNumber;
+  }
+
   function buildHardCardContent(numbers) {
     const { chain, pairFor } = buildHardChain(numbers);
     const chainSet = new Set(chain);
-    const items = shuffle(ITEMS).slice(0, chain.length);
-    const itemForNumber = {};
-    chain.forEach((num, idx) => {
-      itemForNumber[num] = items[idx];
-    });
+    const itemForNumber = assignHardItems(chain, pairFor);
 
     chain.forEach((num, i) => {
       const isStory = i === 0;
@@ -1426,7 +1536,7 @@
         const [a, b] = pairFor[next];
         const aItem = itemForNumber[a];
         const bItem = itemForNumber[b];
-        hint = 'Add ' + aItem.emoji + ' ' + aItem.name + ' and ' + bItem.emoji + ' ' + bItem.name +
+        hint = 'Add ' + itemVisual(aItem) + ' ' + aItem.name + ' and ' + itemVisual(bItem) + ' ' + bItem.name +
           ' to find your next card!';
       }
 
@@ -1470,7 +1580,7 @@
       card.style.animationDelay = (index * 0.06) + 's';
       card.dataset.number = num;
 
-      const iconInner = content.backItem ? `<div class="front-icon">${content.backItem.emoji}</div>` : '';
+      const iconInner = content.backItem ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
 
       card.innerHTML = `
         <div class="card-inner">
@@ -1561,8 +1671,8 @@
     const content = cardContent.get(num);
     zoomCardEl.classList.toggle('story', content.isStory);
     zoomCardEl.classList.toggle('win', content.isWin);
-    zoomNumberEl.textContent = 'Card ' + num +
-      (content.backItem ? ' — ' + content.backItem.emoji + ' ' + content.backItem.name : '');
+    zoomNumberEl.innerHTML = 'Card ' + num +
+      (content.backItem ? ' — ' + itemVisual(content.backItem) + ' ' + content.backItem.name : '');
     zoomMessageEl.textContent = content.message;
 
     const showPuzzle = content.puzzle && !content.puzzle.solved;
@@ -1573,7 +1683,7 @@
     if (showPuzzle) {
       renderPuzzle(content, num);
     } else {
-      zoomHintEl.textContent = content.puzzle ? ('Flip over card ' + content.puzzle.answer + '!') : content.hint;
+      zoomHintEl.innerHTML = content.puzzle ? ('Flip over card ' + content.puzzle.answer + '!') : content.hint;
     }
 
     zoomOverlay.classList.add('open');

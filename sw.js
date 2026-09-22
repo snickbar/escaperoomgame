@@ -1,10 +1,20 @@
-const CACHE_NAME = 'escape-room-v8';
+const CACHE_NAME = 'escape-room-v9';
+const ITEM_ART_THEMES = [
+  'bike-tire', 'campfire', 'candle', 'cut-fence', 'fish-hook', 'flashlight',
+  'mirror', 'old-diary', 'parrot-cage', 'pencil', 'rose', 'rune-tablet',
+  'safe', 'tea',
+];
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  ...ITEM_ART_THEMES.flatMap((theme) => [
+    `./art/items/${theme}-a.jpg`,
+    `./art/items/${theme}-b.jpg`,
+    `./art/items/${theme}-c.jpg`,
+  ]),
 ];
 
 self.addEventListener('install', (event) => {
