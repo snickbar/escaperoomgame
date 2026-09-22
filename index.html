@@ -552,9 +552,15 @@
   }
 
   .zoom-message {
-    font-size: 32px;
+    font-size: 19px;
     font-weight: 700;
+    line-height: 1.3;
     color: #d8f5e6;
+  }
+
+  .zoom-card.win .zoom-message,
+  .zoom-card.story .zoom-message {
+    font-size: 22px;
   }
 
   .zoom-hint {
@@ -1097,6 +1103,53 @@
   function randomInt(min, max) {
     return min + Math.floor(Math.random() * (max - min + 1));
   }
+
+  function pickRandom(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  // A different premise each game, instead of always "Help Lucy...".
+  const STORY_INTROS = [
+    'Help Lucy find her lost dog!',
+    'You’re locked in the library after hours!',
+    'A torn treasure map needs piecing together!',
+    'The wizard’s tower has sealed shut!',
+    'Something strange stirs in these woods!',
+    'The museum locks down at midnight!',
+    'A storm has trapped you in the lighthouse!',
+    'Your train has stopped in the middle of nowhere!',
+    'The fortune teller left one last riddle!',
+    'You woke up in a mansion with no memory!',
+  ];
+
+  // Shown as a little narrative beat before a "flip over card X" hint, so no
+  // card is ever just a bare instruction.
+  const STORY_BEATS = [
+    'You spot a faint trail leading further in.',
+    'Something rustles just out of sight.',
+    'A clue catches your eye across the room.',
+    'You feel like you’re getting closer.',
+    'A note flutters down, pointing the way.',
+    'Something here feels promising.',
+    'You hear a faint sound nearby.',
+    'A glint of something catches your eye.',
+    'The trail continues, just a little further.',
+    'Your instincts say to keep looking.',
+    'A shadow shifts nearby — something’s here.',
+    'The air feels different here — you’re close.',
+    'You notice a detail you missed before.',
+    'This seems important — keep going.',
+  ];
+
+  // The little "you did it" beat on a combo card, paired with the item name.
+  const COMBO_PRAISE = [
+    'You made the',
+    'Success! You created the',
+    'It worked! You now have the',
+    'At last — you assembled the',
+    'Clever thinking! You built the',
+    'Excellent! You put together the',
+  ];
 
   const DECKS = {
     easy: {
@@ -1764,46 +1817,57 @@
   //            unlocks; once flipped it continues the chain like a story
   //            node
   //   win    — the escape card; every dead-end node unlocks it
+  //
+  // Nodes below MIN_BRANCH_DEPTH always get exactly one child (a forced
+  // linear "spine" out of the root) so a game can never fan out — and
+  // therefore can never dead-end — in the first couple of hops.
+  const MIN_BRANCH_DEPTH = 2;
+
   function buildStoryGraph(usedCount) {
     const nodes = [];
-    function makeNode(kind) {
-      const node = { id: nodes.length, kind, unlocks: [], requires: null, isStart: false, isWin: false };
+    function makeNode(kind, depth) {
+      const node = { id: nodes.length, kind, depth, unlocks: [], requires: null, isStart: false, isWin: false };
       nodes.push(node);
       return node;
     }
 
-    const root = makeNode('story');
+    const root = makeNode('story', 0);
     root.isStart = true;
 
     // Reserve one slot for root and one for the win card that closes every
     // dead-end branch, so the graph always lands on exactly usedCount nodes.
     let budget = usedCount - 2;
     const queue = [root];
+    let comboGuaranteed = false;
 
     while (queue.length && budget > 0) {
       const node = queue.shift();
       // A puzzle only ever reveals a single answer, so it can't branch or
       // kick off a combo — it always gets exactly one child.
       const isPuzzle = node.kind === 'puzzle';
-      const canCombo = !isPuzzle && budget >= 3;
-      // The very first branch is always an object pair, so a combo (and
-      // therefore its artwork) is guaranteed to appear every game.
-      const wantsCombo = canCombo && (node.isStart || Math.random() < 0.28);
+      const canBranch = node.depth >= MIN_BRANCH_DEPTH;
+      const canCombo = !isPuzzle && canBranch && budget >= 3;
+      // The first node eligible to branch at all is always an object pair,
+      // so a combo (and therefore its artwork) is guaranteed every game —
+      // every table has at least ~22 budget to spare at this point, so
+      // this can't fail to find an eligible node before budget runs out.
+      const wantsCombo = canCombo && (!comboGuaranteed || Math.random() < 0.28);
 
       if (wantsCombo) {
-        const objA = makeNode('object');
-        const objB = makeNode('object');
-        const combo = makeNode('combo');
+        comboGuaranteed = true;
+        const objA = makeNode('object', node.depth + 1);
+        const objB = makeNode('object', node.depth + 1);
+        const combo = makeNode('combo', node.depth + 1);
         combo.requires = [objA.id, objB.id];
         node.unlocks.push(objA.id, objB.id);
         queue.push(combo);
         budget -= 3;
       } else {
-        const wantsTwo = !isPuzzle && budget >= 2 && Math.random() < 0.35;
+        const wantsTwo = !isPuzzle && canBranch && budget >= 2 && Math.random() < 0.35;
         const childCount = wantsTwo ? 2 : 1;
         for (let i = 0; i < childCount && budget > 0; i++) {
           const kind = Math.random() < 0.55 ? 'story' : 'puzzle';
-          const child = makeNode(kind);
+          const child = makeNode(kind, node.depth + 1);
           node.unlocks.push(child.id);
           queue.push(child);
           budget -= 1;
@@ -1811,7 +1875,7 @@
       }
     }
 
-    const win = makeNode('win');
+    const win = makeNode('win', 0);
     win.isWin = true;
     nodes.forEach((n) => {
       if (n === win || n.kind === 'object') return;
@@ -1919,8 +1983,10 @@
       let hint = '';
       let puzzle = null;
 
+      let hasBeat = false;
+
       if (n.isStart) {
-        message = DECKS.story.story;
+        message = pickRandom(STORY_INTROS);
         hint = describeUnlocks(unlockNums);
       } else if (n.isWin) {
         message = '\u{1F389} You escaped!';
@@ -1935,14 +2001,18 @@
       } else if (n.kind === 'combo') {
         // The payoff card: confirms what got made and, like a story card,
         // still has to say what to flip next — losing this was the bug.
-        message = '✓ You made the ' + (backItem ? backItem.name : 'item') + '!';
+        message = pickRandom(COMBO_PRAISE) + ' ' + (backItem ? backItem.name : 'item') + '!';
         hint = describeUnlocks(unlockNums);
+        hasBeat = true;
       } else {
+        // A plain story beat — never just the bare "flip over card X".
+        message = pickRandom(STORY_BEATS);
         hint = describeUnlocks(unlockNums);
+        hasBeat = true;
       }
 
       cardContent.set(num, {
-        isStory: n.isStart, isWin: n.isWin, isSeed: n.isStart,
+        isStory: n.isStart, isWin: n.isWin, isSeed: n.isStart, hasBeat,
         unlocks: unlockNums, requires: requiresNums,
         message, hint, backItem, puzzle,
       });
@@ -2017,10 +2087,11 @@
       const hasArt = !!content.backItem;
       const isCombo = !!content.requires;
       const iconInner = hasArt ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
-      // Only the story intro, the win card, and a combo's "you made it!"
-      // line carry real flavor text — the generic "Nicely done!" on every
-      // other card was just clutter that pushed the hint off the card.
-      const messageInner = (content.isStory || content.isWin || isCombo) ? `<div class="message">${content.message}</div>` : '';
+      // The story intro, the win card, a combo's "you made it!" line, and
+      // every plain story beat all carry real flavor text — the generic
+      // "Nicely done!" on every legacy-mode card was just clutter that
+      // pushed the hint off the card, so that one's still suppressed.
+      const messageInner = (content.isStory || content.isWin || content.hasBeat) ? `<div class="message">${content.message}</div>` : '';
       // Ingredient (object) cards are just the picture with no hint text —
       // the player has to notice the pairing themselves. Everything else,
       // including a combo's own "flip over card X" payoff, still needs it.
