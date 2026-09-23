@@ -874,6 +874,18 @@
     background: rgba(255, 255, 255, 0.12);
   }
 
+  .pipe-tile:disabled {
+    cursor: default;
+  }
+
+  .pipe-tile:disabled:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .pipe-tile.empty {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
   .pipe-hub {
     position: absolute;
     top: 38%;
@@ -917,13 +929,6 @@
     height: 24%;
   }
 
-  .pipe-tile.start .pipe-hub,
-  .pipe-tile.start .pipe-arm,
-  .pipe-tile.end .pipe-hub,
-  .pipe-tile.end .pipe-arm {
-    background: rgba(255, 215, 106, 0.7);
-  }
-
   .pipe-tile.connected .pipe-hub,
   .pipe-tile.connected .pipe-arm {
     background: #7ee6a8;
@@ -931,6 +936,36 @@
 
   .pipe-tile.hinted {
     box-shadow: 0 0 0 2px #ffd76a inset;
+  }
+
+  .pipe-tile.start {
+    box-shadow: 0 0 0 2px #4c9df0 inset;
+  }
+
+  .pipe-tile.end {
+    box-shadow: 0 0 0 2px #e05252 inset;
+  }
+
+  .pipe-badge {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    padding: 1px 3px;
+    border-radius: 3px;
+    color: #14161c;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .pipe-badge.start {
+    background: #4c9df0;
+  }
+
+  .pipe-badge.end {
+    background: #e05252;
   }
 
   .puzzle-feedback {
@@ -1760,12 +1795,11 @@
 
   const PIPES_ROWS = 4;
   const PIPES_COLS = 4;
-  const PIPES_PATH_MIN = 7;
-  const PIPES_PATH_MAX = 10;
+  const PIPES_UNUSED_MIN = 1;
+  const PIPES_UNUSED_MAX = 4;
   const DIR_BIT = { N: 1, E: 2, S: 4, W: 8 };
   const OPPOSITE_DIR = { N: 'S', S: 'N', E: 'W', W: 'E' };
   const DIR_DELTA = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
-  const PIPES_DECOY_SHAPES = [DIR_BIT.N, DIR_BIT.N | DIR_BIT.S, DIR_BIT.N | DIR_BIT.E];
 
   function rotateMask(mask, steps) {
     let m = mask;
@@ -1787,27 +1821,36 @@
     return 'E';
   }
 
-  // Randomized self-avoiding walk, so the result is always a simple
-  // (non-branching, non-crossing) path from its first cell to its last.
+  // Backtracking self-avoiding walk (a real search, not just a greedy one —
+  // a greedy walk traps itself in dead ends long before covering most of a
+  // small grid). Keeps track of the longest path found so far, so it can
+  // still return a good result even if it can't quite reach targetLen.
   function carvePipesPath(rows, cols, targetLen) {
-    const cells = [];
+    let best = [];
     const visited = new Set();
-    const r = randomInt(0, rows - 1);
-    const c = randomInt(0, cols - 1);
-    cells.push([r, c]);
-    visited.add(r + ',' + c);
-    while (cells.length < targetLen) {
-      const [cr, cc] = cells[cells.length - 1];
-      const options = shuffle(['N', 'S', 'E', 'W'])
-        .map((dir) => DIR_DELTA[dir])
-        .map(([dr, dc]) => [cr + dr, cc + dc])
-        .filter(([nr, nc]) => nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited.has(nr + ',' + nc));
-      if (!options.length) break;
-      const [nr, nc] = options[0];
-      cells.push([nr, nc]);
-      visited.add(nr + ',' + nc);
+    const path = [];
+
+    function dfs(r, c) {
+      path.push([r, c]);
+      visited.add(r + ',' + c);
+      if (path.length > best.length) best = path.slice();
+      if (path.length < targetLen) {
+        const options = shuffle(['N', 'S', 'E', 'W'])
+          .map((dir) => DIR_DELTA[dir])
+          .map(([dr, dc]) => [r + dr, c + dc])
+          .filter(([nr, nc]) => nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited.has(nr + ',' + nc));
+        for (const [nr, nc] of options) {
+          if (dfs(nr, nc)) return true;
+        }
+      }
+      const reachedTarget = path.length >= targetLen;
+      path.pop();
+      visited.delete(r + ',' + c);
+      return reachedTarget;
     }
-    return cells;
+
+    dfs(randomInt(0, rows - 1), randomInt(0, cols - 1));
+    return best;
   }
 
   // BFS from the start tile, following only mutually-aligned openings —
@@ -1843,12 +1886,9 @@
   }
 
   function buildPipesAttempt(target) {
-    let path = [];
-    let guard = 0;
-    while (path.length < PIPES_PATH_MIN && guard < 10) {
-      path = carvePipesPath(PIPES_ROWS, PIPES_COLS, randomInt(PIPES_PATH_MIN, PIPES_PATH_MAX));
-      guard++;
-    }
+    const totalCells = PIPES_ROWS * PIPES_COLS;
+    const targetLen = totalCells - randomInt(PIPES_UNUSED_MIN, PIPES_UNUSED_MAX);
+    const path = carvePipesPath(PIPES_ROWS, PIPES_COLS, targetLen);
 
     const pathKeys = new Set(path.map(([r, c]) => r + ',' + c));
     const correctMaskByKey = {};
@@ -1870,14 +1910,20 @@
         let correctMask = null;
         if (isPath) {
           correctMask = correctMaskByKey[key];
-          openings = correctMask;
-          let attempts = 0;
-          while (openings === correctMask && attempts < 6) {
-            openings = rotateMask(correctMask, 1 + Math.floor(Math.random() * 3));
-            attempts++;
+          if (isStart || isEnd) {
+            // Fixed in place — not rotatable, so it always shows correctly.
+            openings = correctMask;
+          } else {
+            openings = correctMask;
+            let attempts = 0;
+            while (openings === correctMask && attempts < 6) {
+              openings = rotateMask(correctMask, 1 + Math.floor(Math.random() * 3));
+              attempts++;
+            }
           }
         } else {
-          openings = rotateMask(pickRandom(PIPES_DECOY_SHAPES), Math.floor(Math.random() * 4));
+          // Unused cell — left visually blank, not part of the puzzle.
+          openings = 0;
         }
         tiles.push({ row: r, col: c, isPath, isStart, isEnd, openings, correctMask });
       }
@@ -3297,8 +3343,8 @@
     swapGridEl.hidden = true;
     pipesGridEl.hidden = false;
 
-    puzzleInstructionsEl.textContent = 'Tap a pipe to rotate it. Connect the gold start tile ' +
-      'to the gold end tile.';
+    puzzleInstructionsEl.textContent = 'Tap a pipe to rotate it. Connect S (start) to E (end) — ' +
+      'those two are fixed in place.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3325,8 +3371,8 @@
     }
 
     // Snaps one wrong path tile straight to its correct orientation
-    // (decoy tiles don't have a "correct" state, so only path tiles
-    // are eligible).
+    // (start/end are already fixed correctly, so only interior path
+    // tiles are ever eligible).
     function useHint() {
       if (p.solved || p.hintsRemaining <= 0) return;
       const wrongPathTiles = p.tiles.filter((t) => t.isPath && t.openings !== t.correctMask);
@@ -3371,19 +3417,26 @@
       const connected = pipesConnectedSet(p.tiles);
       p.tiles.forEach((t) => {
         const key = t.row + ',' + t.col;
+        const fixed = t.isStart || t.isEnd || !t.isPath;
         const tile = document.createElement('button');
         tile.className = 'pipe-tile' +
           (t.isStart ? ' start' : '') + (t.isEnd ? ' end' : '') +
+          (!t.isPath ? ' empty' : '') +
           (connected.has(key) ? ' connected' : '') +
           (hintedKey === key ? ' hinted' : '');
-        tile.disabled = p.solved;
-        let inner = '<div class="pipe-hub"></div>';
-        ['N', 'S', 'E', 'W'].forEach((dir) => {
-          if (t.openings & DIR_BIT[dir]) inner += '<div class="pipe-arm ' + dir.toLowerCase() + '"></div>';
-        });
+        tile.disabled = p.solved || fixed;
+        let inner = '';
+        if (t.isPath) {
+          inner += '<div class="pipe-hub"></div>';
+          ['N', 'S', 'E', 'W'].forEach((dir) => {
+            if (t.openings & DIR_BIT[dir]) inner += '<div class="pipe-arm ' + dir.toLowerCase() + '"></div>';
+          });
+        }
+        if (t.isStart) inner += '<div class="pipe-badge start">S</div>';
+        if (t.isEnd) inner += '<div class="pipe-badge end">E</div>';
         tile.innerHTML = inner;
         tile.addEventListener('click', () => {
-          if (p.solved) return;
+          if (p.solved || fixed) return;
           hintedKey = null;
           t.openings = rotateMask(t.openings, 1);
           renderTiles();
