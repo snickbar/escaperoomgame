@@ -851,6 +851,88 @@
     color: #7ee6a8;
   }
 
+  /* --- Pipes puzzle --- */
+
+  .pipes-grid {
+    display: grid;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .pipe-tile {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    border-radius: 6px;
+    border: none;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .pipe-tile:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .pipe-hub {
+    position: absolute;
+    top: 38%;
+    left: 38%;
+    width: 24%;
+    height: 24%;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.32);
+  }
+
+  .pipe-arm {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.32);
+  }
+
+  .pipe-arm.n {
+    top: 0;
+    left: 38%;
+    width: 24%;
+    height: 42%;
+  }
+
+  .pipe-arm.s {
+    bottom: 0;
+    left: 38%;
+    width: 24%;
+    height: 42%;
+  }
+
+  .pipe-arm.e {
+    right: 0;
+    top: 38%;
+    width: 42%;
+    height: 24%;
+  }
+
+  .pipe-arm.w {
+    left: 0;
+    top: 38%;
+    width: 42%;
+    height: 24%;
+  }
+
+  .pipe-tile.start .pipe-hub,
+  .pipe-tile.start .pipe-arm,
+  .pipe-tile.end .pipe-hub,
+  .pipe-tile.end .pipe-arm {
+    background: rgba(255, 215, 106, 0.7);
+  }
+
+  .pipe-tile.connected .pipe-hub,
+  .pipe-tile.connected .pipe-arm {
+    background: #7ee6a8;
+  }
+
+  .pipe-tile.hinted {
+    box-shadow: 0 0 0 2px #ffd76a inset;
+  }
+
   .puzzle-feedback {
     font-size: 13px;
     font-weight: 600;
@@ -1190,6 +1272,7 @@
       <div class="cipher-keyboard" id="cipherKeyboard"></div>
       <div class="slider-grid" id="sliderGrid" hidden></div>
       <div class="swap-grid" id="swapGrid" hidden></div>
+      <div class="pipes-grid" id="pipesGrid" hidden></div>
       <button class="puzzle-hint" id="puzzleHint">&#128161; Hint (2)</button>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
@@ -1355,6 +1438,13 @@
       icon: '\u{1F522}',
       tagline: 'Tap two tiles to swap them into order',
       accent: '#e0a34c',
+    },
+    pipes: {
+      id: 'pipes',
+      label: 'Pipes',
+      icon: '\u{1F6B0}',
+      tagline: 'Rotate tiles in place to connect start to end (not in regular play yet)',
+      accent: '#4cc9c9',
     },
   };
 
@@ -1666,6 +1756,155 @@
     };
   }
 
+  // --- Pipes puzzle: rotate tiles in place to connect start to end ---
+
+  const PIPES_ROWS = 4;
+  const PIPES_COLS = 4;
+  const PIPES_PATH_MIN = 7;
+  const PIPES_PATH_MAX = 10;
+  const DIR_BIT = { N: 1, E: 2, S: 4, W: 8 };
+  const OPPOSITE_DIR = { N: 'S', S: 'N', E: 'W', W: 'E' };
+  const DIR_DELTA = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
+  const PIPES_DECOY_SHAPES = [DIR_BIT.N, DIR_BIT.N | DIR_BIT.S, DIR_BIT.N | DIR_BIT.E];
+
+  function rotateMask(mask, steps) {
+    let m = mask;
+    for (let s = 0; s < ((steps % 4) + 4) % 4; s++) {
+      let next = 0;
+      if (m & DIR_BIT.N) next |= DIR_BIT.E;
+      if (m & DIR_BIT.E) next |= DIR_BIT.S;
+      if (m & DIR_BIT.S) next |= DIR_BIT.W;
+      if (m & DIR_BIT.W) next |= DIR_BIT.N;
+      m = next;
+    }
+    return m;
+  }
+
+  function pipesDirBetween(a, b) {
+    if (b[0] === a[0] - 1) return 'N';
+    if (b[0] === a[0] + 1) return 'S';
+    if (b[1] === a[1] - 1) return 'W';
+    return 'E';
+  }
+
+  // Randomized self-avoiding walk, so the result is always a simple
+  // (non-branching, non-crossing) path from its first cell to its last.
+  function carvePipesPath(rows, cols, targetLen) {
+    const cells = [];
+    const visited = new Set();
+    const r = randomInt(0, rows - 1);
+    const c = randomInt(0, cols - 1);
+    cells.push([r, c]);
+    visited.add(r + ',' + c);
+    while (cells.length < targetLen) {
+      const [cr, cc] = cells[cells.length - 1];
+      const options = shuffle(['N', 'S', 'E', 'W'])
+        .map((dir) => DIR_DELTA[dir])
+        .map(([dr, dc]) => [cr + dr, cc + dc])
+        .filter(([nr, nc]) => nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited.has(nr + ',' + nc));
+      if (!options.length) break;
+      const [nr, nc] = options[0];
+      cells.push([nr, nc]);
+      visited.add(nr + ',' + nc);
+    }
+    return cells;
+  }
+
+  // BFS from the start tile, following only mutually-aligned openings —
+  // used both to check the win condition and to highlight the connected
+  // component so far.
+  function pipesConnectedSet(tiles) {
+    const byPos = {};
+    tiles.forEach((t) => { byPos[t.row + ',' + t.col] = t; });
+    const start = tiles.find((t) => t.isStart);
+    const visited = new Set([start.row + ',' + start.col]);
+    const queue = [start];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const dir of ['N', 'S', 'E', 'W']) {
+        if (!(cur.openings & DIR_BIT[dir])) continue;
+        const [dr, dc] = DIR_DELTA[dir];
+        const nr = cur.row + dr;
+        const nc = cur.col + dc;
+        const neighbor = byPos[nr + ',' + nc];
+        if (!neighbor || !(neighbor.openings & DIR_BIT[OPPOSITE_DIR[dir]])) continue;
+        const key = nr + ',' + nc;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        queue.push(neighbor);
+      }
+    }
+    return visited;
+  }
+
+  function pipesIsSolved(p) {
+    const end = p.tiles.find((t) => t.isEnd);
+    return pipesConnectedSet(p.tiles).has(end.row + ',' + end.col);
+  }
+
+  function buildPipesAttempt(target) {
+    let path = [];
+    let guard = 0;
+    while (path.length < PIPES_PATH_MIN && guard < 10) {
+      path = carvePipesPath(PIPES_ROWS, PIPES_COLS, randomInt(PIPES_PATH_MIN, PIPES_PATH_MAX));
+      guard++;
+    }
+
+    const pathKeys = new Set(path.map(([r, c]) => r + ',' + c));
+    const correctMaskByKey = {};
+    path.forEach(([r, c], i) => {
+      let mask = 0;
+      if (i > 0) mask |= DIR_BIT[pipesDirBetween([r, c], path[i - 1])];
+      if (i < path.length - 1) mask |= DIR_BIT[pipesDirBetween([r, c], path[i + 1])];
+      correctMaskByKey[r + ',' + c] = mask;
+    });
+
+    const tiles = [];
+    for (let r = 0; r < PIPES_ROWS; r++) {
+      for (let c = 0; c < PIPES_COLS; c++) {
+        const key = r + ',' + c;
+        const isPath = pathKeys.has(key);
+        const isStart = isPath && r === path[0][0] && c === path[0][1];
+        const isEnd = isPath && r === path[path.length - 1][0] && c === path[path.length - 1][1];
+        let openings;
+        let correctMask = null;
+        if (isPath) {
+          correctMask = correctMaskByKey[key];
+          openings = correctMask;
+          let attempts = 0;
+          while (openings === correctMask && attempts < 6) {
+            openings = rotateMask(correctMask, 1 + Math.floor(Math.random() * 3));
+            attempts++;
+          }
+        } else {
+          openings = rotateMask(pickRandom(PIPES_DECOY_SHAPES), Math.floor(Math.random() * 4));
+        }
+        tiles.push({ row: r, col: c, isPath, isStart, isEnd, openings, correctMask });
+      }
+    }
+
+    return {
+      type: 'pipes',
+      rows: PIPES_ROWS,
+      cols: PIPES_COLS,
+      tiles,
+      answer: target,
+      solved: false,
+      hintsRemaining: PUZZLE_HINT_COUNT,
+      reveal: 'Flip over card ' + target + '!',
+    };
+  }
+
+  function makePipesPuzzle(target) {
+    let puzzle;
+    let guard = 0;
+    do {
+      puzzle = buildPipesAttempt(target);
+      guard++;
+    } while (pipesIsSolved(puzzle) && guard < 5);
+    return puzzle;
+  }
+
   // Story Mode picks one of these at random for each puzzle card.
   const PUZZLE_GENERATORS = [
     { make: makeCryptogramPuzzle, hint: '\u{1F9E9} Solve the puzzle to find your next card!' },
@@ -1760,6 +1999,7 @@
   const cipherKeyboardEl = document.getElementById('cipherKeyboard');
   const sliderGridEl = document.getElementById('sliderGrid');
   const swapGridEl = document.getElementById('swapGrid');
+  const pipesGridEl = document.getElementById('pipesGrid');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleHintEl = document.getElementById('puzzleHint');
@@ -2600,6 +2840,8 @@
       renderSliderPuzzle(content, num, opts);
     } else if (content.puzzle.type === 'swap') {
       renderSwapPuzzle(content, num, opts);
+    } else if (content.puzzle.type === 'pipes') {
+      renderPipesPuzzle(content, num, opts);
     } else {
       renderCipherPuzzle(content, num, opts);
     }
@@ -2614,6 +2856,7 @@
     cipherKeyboardEl.hidden = false;
     sliderGridEl.hidden = true;
     swapGridEl.hidden = true;
+    pipesGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = p.type === 'cryptogram'
       ? 'Figure out the hidden phrase! Tap a blank, then tap a letter — matching letters fill in together.'
@@ -2850,6 +3093,7 @@
     cipherKeyboardEl.hidden = true;
     sliderGridEl.hidden = false;
     swapGridEl.hidden = true;
+    pipesGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Slide the tiles into order, 1 through 8. Tap any ' +
       'tile next to the empty space to move it there.';
@@ -2930,6 +3174,7 @@
     cipherKeyboardEl.hidden = true;
     sliderGridEl.hidden = true;
     swapGridEl.hidden = false;
+    pipesGridEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Tap a tile, then tap another to swap them. ' +
       'Arrange 1 through 16 in order to solve it.';
@@ -3041,6 +3286,123 @@
     };
   }
 
+  function renderPipesPuzzle(content, num, opts) {
+    opts = opts || {};
+    const isTest = !!opts.isTest;
+    const p = content.puzzle;
+
+    cipherGridEl.hidden = true;
+    cipherKeyboardEl.hidden = true;
+    sliderGridEl.hidden = true;
+    swapGridEl.hidden = true;
+    pipesGridEl.hidden = false;
+
+    puzzleInstructionsEl.textContent = 'Tap a pipe to rotate it. Connect the gold start tile ' +
+      'to the gold end tile.';
+    puzzleFeedbackEl.textContent = '';
+    puzzleFeedbackEl.className = 'puzzle-feedback';
+    puzzleAgainEl.hidden = true;
+    puzzleRevealEl.hidden = true;
+    puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
+    puzzleRevealToggleEl.onclick = () => {
+      const showing = !puzzleRevealEl.hidden;
+      puzzleRevealEl.hidden = showing;
+      puzzleRevealToggleEl.textContent = showing
+        ? '\u{1F50D} Show Answer (dev)'
+        : '\u{1F648} Hide Answer';
+      puzzleRevealEl.textContent = p.reveal;
+    };
+
+    puzzleHintEl.hidden = false;
+    updateHintButton();
+    puzzleHintEl.onclick = useHint;
+
+    let hintedKey = null;
+
+    function updateHintButton() {
+      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
+    }
+
+    // Snaps one wrong path tile straight to its correct orientation
+    // (decoy tiles don't have a "correct" state, so only path tiles
+    // are eligible).
+    function useHint() {
+      if (p.solved || p.hintsRemaining <= 0) return;
+      const wrongPathTiles = p.tiles.filter((t) => t.isPath && t.openings !== t.correctMask);
+      if (!wrongPathTiles.length) return;
+      const tile = pickRandom(wrongPathTiles);
+      tile.openings = tile.correctMask;
+      p.hintsRemaining--;
+      hintedKey = tile.row + ',' + tile.col;
+      updateHintButton();
+      renderTiles();
+      if (pipesIsSolved(p)) {
+        solvePuzzle();
+        renderTiles();
+      }
+    }
+
+    function solvePuzzle() {
+      p.solved = true;
+      hintedKey = null;
+      updateHintButton();
+      puzzleFeedbackEl.className = 'puzzle-feedback correct';
+      if (isTest) {
+        puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
+        puzzleAgainEl.hidden = false;
+      } else {
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      }
+    }
+
+    function renderTiles() {
+      pipesGridEl.innerHTML = '';
+      pipesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', 46px)';
+      pipesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', 46px)';
+      const connected = pipesConnectedSet(p.tiles);
+      p.tiles.forEach((t) => {
+        const key = t.row + ',' + t.col;
+        const tile = document.createElement('button');
+        tile.className = 'pipe-tile' +
+          (t.isStart ? ' start' : '') + (t.isEnd ? ' end' : '') +
+          (connected.has(key) ? ' connected' : '') +
+          (hintedKey === key ? ' hinted' : '');
+        tile.disabled = p.solved;
+        let inner = '<div class="pipe-hub"></div>';
+        ['N', 'S', 'E', 'W'].forEach((dir) => {
+          if (t.openings & DIR_BIT[dir]) inner += '<div class="pipe-arm ' + dir.toLowerCase() + '"></div>';
+        });
+        tile.innerHTML = inner;
+        tile.addEventListener('click', () => {
+          if (p.solved) return;
+          hintedKey = null;
+          t.openings = rotateMask(t.openings, 1);
+          renderTiles();
+          if (pipesIsSolved(p)) {
+            solvePuzzle();
+            renderTiles();
+          }
+        });
+        pipesGridEl.appendChild(tile);
+      });
+    }
+
+    renderTiles();
+
+    puzzleAgainEl.onclick = () => {
+      if (opts.onRetry) opts.onRetry();
+    };
+  }
+
   function openTestPuzzle(type) {
     const game = MINI_GAMES[type];
     let content = null;
@@ -3049,7 +3411,7 @@
       const target = 1 + Math.floor(Math.random() * CARD_COUNT);
       const makers = {
         cryptogram: makeCryptogramPuzzle, cipher: makeCipherPuzzle,
-        slider: makeSliderPuzzle, swap: makeSwapPuzzle,
+        slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle,
       };
       content = {
         isStory: false,
