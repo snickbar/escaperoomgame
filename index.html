@@ -968,6 +968,93 @@
     background: #e05252;
   }
 
+  /* --- Shapes puzzle --- */
+
+  .shapes-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .shapes-grid {
+    display: grid;
+    gap: 2px;
+    background: rgba(0, 0, 0, 0.25);
+    padding: 4px;
+    border-radius: 6px;
+  }
+
+  .shapes-cell {
+    width: 38px;
+    height: 38px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .shapes-cell:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .shapes-cell.filled {
+    cursor: pointer;
+  }
+
+  .shapes-rotate {
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #d8f5e6;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .shapes-rotate:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  .shapes-rotate:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .shapes-tray {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .shapes-piece {
+    display: grid;
+    gap: 1px;
+    padding: 3px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.04);
+    cursor: pointer;
+  }
+
+  .shapes-piece.selected {
+    border-color: #ffd76a;
+    background: rgba(255, 215, 106, 0.12);
+  }
+
+  .shapes-piece-cell {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+  }
+
   .puzzle-feedback {
     font-size: 13px;
     font-weight: 600;
@@ -1308,6 +1395,11 @@
       <div class="slider-grid" id="sliderGrid" hidden></div>
       <div class="swap-grid" id="swapGrid" hidden></div>
       <div class="pipes-grid" id="pipesGrid" hidden></div>
+      <div class="shapes-area" id="shapesArea" hidden>
+        <div class="shapes-grid" id="shapesGrid"></div>
+        <button class="shapes-rotate" id="shapesRotate">&#128260; Rotate</button>
+        <div class="shapes-tray" id="shapesTray"></div>
+      </div>
       <button class="puzzle-hint" id="puzzleHint">&#128161; Hint (2)</button>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
@@ -1480,6 +1572,13 @@
       icon: '\u{1F6B0}',
       tagline: 'Rotate tiles in place to connect start to end (not in regular play yet)',
       accent: '#4cc9c9',
+    },
+    shapes: {
+      id: 'shapes',
+      label: 'Shapes',
+      icon: '\u{1F7EA}',
+      tagline: 'Fit the pieces into the board (not in regular play yet)',
+      accent: '#b98cf0',
     },
   };
 
@@ -1951,6 +2050,155 @@
     return puzzle;
   }
 
+  // --- Shapes puzzle: fit polyomino pieces into a rectangle ---
+
+  const SHAPES_ROWS = 5;
+  const SHAPES_COLS = 4;
+  const SHAPES_TARGET_PIECE_SIZE = 4;
+  const SHAPES_PALETTE = ['#4caf7d', '#4c9df0', '#e0a34c', '#e05252', '#b98cf0', '#4cc9c9', '#ffd76a'];
+
+  // 90-degree clockwise rotation of a normalized (min row/col = 0) cell
+  // list, re-normalized so the result is always min row/col = 0 too.
+  function rotatePieceCells(cells) {
+    const maxR = Math.max(...cells.map(([r]) => r));
+    const rotated = cells.map(([r, c]) => [c, maxR - r]);
+    const minR = Math.min(...rotated.map(([r]) => r));
+    const minC = Math.min(...rotated.map(([, c]) => c));
+    return rotated.map(([r, c]) => [r - minR, c - minC]);
+  }
+
+  // Fills the whole grid with connected pieces, growing each one cell by
+  // cell from a random unassigned start toward targetSize (accepting a
+  // smaller leftover piece if growth gets boxed in) — every cell always
+  // ends up owned by exactly one piece, so the board is always fully
+  // coverable by construction, no retry needed.
+  function buildShapesTiling(rows, cols, targetSize) {
+    const idx = (r, c) => r * cols + c;
+    const owner = new Array(rows * cols).fill(-1);
+    const pieces = [];
+
+    for (let start = 0; start < rows * cols; start++) {
+      if (owner[start] !== -1) continue;
+      const sr = Math.floor(start / cols);
+      const sc = start % cols;
+      const cells = [[sr, sc]];
+      owner[start] = pieces.length;
+      while (cells.length < targetSize) {
+        const candidates = [];
+        cells.forEach(([r, c]) => {
+          [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && owner[idx(nr, nc)] === -1) {
+              candidates.push([nr, nc]);
+            }
+          });
+        });
+        if (!candidates.length) break;
+        const [nr, nc] = pickRandom(candidates);
+        cells.push([nr, nc]);
+        owner[idx(nr, nc)] = pieces.length;
+      }
+      pieces.push(cells);
+    }
+    return mergeSmallShapePieces(pieces, rows, cols, targetSize);
+  }
+
+  // The growth pass above can strand small leftover fragments (even single
+  // cells) once neighboring pieces box them in. Folds anything under
+  // minSize into a piece it's touching, looping until nothing's left too
+  // small — pieces can end up a bit bigger than targetSize as a result,
+  // but never smaller, which reads much more like real Tetris pieces.
+  function mergeSmallShapePieces(pieces, rows, cols, minSize) {
+    const idx = (r, c) => r * cols + c;
+    let list = pieces.map((cells) => cells.slice());
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const owner = new Array(rows * cols).fill(-1);
+      list.forEach((cells, pi) => cells.forEach(([r, c]) => { owner[idx(r, c)] = pi; }));
+
+      for (let pi = 0; pi < list.length; pi++) {
+        if (list[pi].length >= minSize) continue;
+        let mergeTarget = -1;
+        for (const [r, c] of list[pi]) {
+          for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+            const oi = owner[idx(nr, nc)];
+            if (oi !== -1 && oi !== pi) { mergeTarget = oi; break; }
+          }
+          if (mergeTarget !== -1) break;
+        }
+        if (mergeTarget === -1) continue;
+        list[mergeTarget] = list[mergeTarget].concat(list[pi]);
+        list.splice(pi, 1);
+        changed = true;
+        break;
+      }
+    }
+    return list;
+  }
+
+  function shapesCoverage(p) {
+    const covered = new Array(p.rows * p.cols).fill(null);
+    p.pieces.forEach((piece) => {
+      if (!piece.placed) return;
+      piece.currentCells.forEach(([dr, dc]) => {
+        const r = piece.placedOrigin[0] + dr;
+        const c = piece.placedOrigin[1] + dc;
+        covered[r * p.cols + c] = piece.id;
+      });
+    });
+    return covered;
+  }
+
+  function shapesCanPlace(piece, originR, originC, rows, cols, covered) {
+    return piece.currentCells.every(([dr, dc]) => {
+      const r = originR + dr;
+      const c = originC + dc;
+      return r >= 0 && r < rows && c >= 0 && c < cols && covered[r * cols + c] === null;
+    });
+  }
+
+  function shapesIsSolved(p) {
+    return p.pieces.every((piece) => piece.placed);
+  }
+
+  function makeShapesPuzzle(target) {
+    const rawPieces = buildShapesTiling(SHAPES_ROWS, SHAPES_COLS, SHAPES_TARGET_PIECE_SIZE);
+    const pieces = rawPieces.map((cells, i) => {
+      const minR = Math.min(...cells.map(([r]) => r));
+      const minC = Math.min(...cells.map(([, c]) => c));
+      const solvedCells = cells.map(([r, c]) => [r - minR, c - minC]);
+      const solvedOrigin = [minR, minC];
+      const initialRotation = Math.floor(Math.random() * 4);
+      let currentCells = solvedCells;
+      for (let s = 0; s < initialRotation; s++) currentCells = rotatePieceCells(currentCells);
+      return {
+        id: i,
+        color: SHAPES_PALETTE[i % SHAPES_PALETTE.length],
+        solvedCells,
+        solvedOrigin,
+        currentCells,
+        placed: false,
+        placedOrigin: null,
+      };
+    });
+
+    return {
+      type: 'shapes',
+      rows: SHAPES_ROWS,
+      cols: SHAPES_COLS,
+      pieces,
+      answer: target,
+      solved: false,
+      hintsRemaining: PUZZLE_HINT_COUNT,
+      reveal: 'Flip over card ' + target + '!',
+    };
+  }
+
   // Story Mode picks one of these at random for each puzzle card.
   const PUZZLE_GENERATORS = [
     { make: makeCryptogramPuzzle, hint: '\u{1F9E9} Solve the puzzle to find your next card!' },
@@ -2046,6 +2294,10 @@
   const sliderGridEl = document.getElementById('sliderGrid');
   const swapGridEl = document.getElementById('swapGrid');
   const pipesGridEl = document.getElementById('pipesGrid');
+  const shapesAreaEl = document.getElementById('shapesArea');
+  const shapesGridEl = document.getElementById('shapesGrid');
+  const shapesRotateEl = document.getElementById('shapesRotate');
+  const shapesTrayEl = document.getElementById('shapesTray');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
   const puzzleHintEl = document.getElementById('puzzleHint');
@@ -2888,6 +3140,8 @@
       renderSwapPuzzle(content, num, opts);
     } else if (content.puzzle.type === 'pipes') {
       renderPipesPuzzle(content, num, opts);
+    } else if (content.puzzle.type === 'shapes') {
+      renderShapesPuzzle(content, num, opts);
     } else {
       renderCipherPuzzle(content, num, opts);
     }
@@ -2903,6 +3157,7 @@
     sliderGridEl.hidden = true;
     swapGridEl.hidden = true;
     pipesGridEl.hidden = true;
+    shapesAreaEl.hidden = true;
 
     puzzleInstructionsEl.textContent = p.type === 'cryptogram'
       ? 'Figure out the hidden phrase! Tap a blank, then tap a letter — matching letters fill in together.'
@@ -3140,6 +3395,7 @@
     sliderGridEl.hidden = false;
     swapGridEl.hidden = true;
     pipesGridEl.hidden = true;
+    shapesAreaEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Slide the tiles into order, 1 through 8. Tap any ' +
       'tile next to the empty space to move it there.';
@@ -3221,6 +3477,7 @@
     sliderGridEl.hidden = true;
     swapGridEl.hidden = false;
     pipesGridEl.hidden = true;
+    shapesAreaEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Tap a tile, then tap another to swap them. ' +
       'Arrange 1 through 16 in order to solve it.';
@@ -3342,6 +3599,7 @@
     sliderGridEl.hidden = true;
     swapGridEl.hidden = true;
     pipesGridEl.hidden = false;
+    shapesAreaEl.hidden = true;
 
     puzzleInstructionsEl.textContent = 'Tap a pipe to rotate it. Connect S (start) to E (end) — ' +
       'those two are fixed in place.';
@@ -3456,6 +3714,198 @@
     };
   }
 
+  function renderShapesPuzzle(content, num, opts) {
+    opts = opts || {};
+    const isTest = !!opts.isTest;
+    const p = content.puzzle;
+
+    cipherGridEl.hidden = true;
+    cipherKeyboardEl.hidden = true;
+    sliderGridEl.hidden = true;
+    swapGridEl.hidden = true;
+    pipesGridEl.hidden = true;
+    shapesAreaEl.hidden = false;
+
+    puzzleInstructionsEl.textContent = 'Tap a piece below to select it, Rotate if needed, ' +
+      'then tap a spot on the board to place it. Tap a placed piece to pick it back up.';
+    puzzleFeedbackEl.textContent = '';
+    puzzleFeedbackEl.className = 'puzzle-feedback';
+    puzzleAgainEl.hidden = true;
+    puzzleRevealEl.hidden = true;
+    puzzleRevealToggleEl.textContent = '\u{1F50D} Show Answer (dev)';
+    puzzleRevealToggleEl.onclick = () => {
+      const showing = !puzzleRevealEl.hidden;
+      puzzleRevealEl.hidden = showing;
+      puzzleRevealToggleEl.textContent = showing
+        ? '\u{1F50D} Show Answer (dev)'
+        : '\u{1F648} Hide Answer';
+      puzzleRevealEl.textContent = p.reveal;
+    };
+
+    puzzleHintEl.hidden = false;
+    updateHintButton();
+    puzzleHintEl.onclick = useHint;
+
+    let selectedId = -1;
+
+    function updateHintButton() {
+      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
+    }
+
+    function updateRotateButton() {
+      shapesRotateEl.disabled = p.solved || selectedId === -1;
+    }
+
+    // Places one unplaced piece straight into its original solved slot, if
+    // that slot happens to still be free (it might not be, if the player's
+    // built an alternate arrangement) — tries each unplaced piece in turn.
+    function useHint() {
+      if (p.solved || p.hintsRemaining <= 0) return;
+      const covered = shapesCoverage(p);
+      const candidate = p.pieces.find((pc) => !pc.placed && shapesCanPlace(
+        { currentCells: pc.solvedCells }, pc.solvedOrigin[0], pc.solvedOrigin[1], p.rows, p.cols, covered
+      ));
+      if (!candidate) return;
+      candidate.currentCells = candidate.solvedCells;
+      candidate.placed = true;
+      candidate.placedOrigin = candidate.solvedOrigin;
+      p.hintsRemaining--;
+      selectedId = -1;
+      updateHintButton();
+      render();
+      if (shapesIsSolved(p)) {
+        solvePuzzle();
+        render();
+      }
+    }
+
+    function solvePuzzle() {
+      p.solved = true;
+      selectedId = -1;
+      updateHintButton();
+      updateRotateButton();
+      puzzleFeedbackEl.className = 'puzzle-feedback correct';
+      if (isTest) {
+        puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
+        puzzleAgainEl.hidden = false;
+      } else {
+        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
+        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        setTimeout(() => {
+          zoomCardEl.classList.remove('has-puzzle');
+          zoomHintEl.hidden = false;
+          zoomPuzzleEl.hidden = true;
+          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+        }, 900);
+      }
+    }
+
+    function onGridCellClick(r, c) {
+      if (p.solved) return;
+      const covered = shapesCoverage(p);
+      const pieceId = covered[r * p.cols + c];
+      if (pieceId !== null) {
+        const piece = p.pieces.find((pc) => pc.id === pieceId);
+        piece.placed = false;
+        piece.placedOrigin = null;
+        selectedId = piece.id;
+        puzzleFeedbackEl.textContent = '';
+        puzzleFeedbackEl.className = 'puzzle-feedback';
+        render();
+        return;
+      }
+      if (selectedId === -1) return;
+      const piece = p.pieces.find((pc) => pc.id === selectedId);
+      if (!piece || piece.placed) return;
+      if (!shapesCanPlace(piece, r, c, p.rows, p.cols, covered)) {
+        puzzleFeedbackEl.textContent = 'Doesn’t fit there!';
+        puzzleFeedbackEl.className = 'puzzle-feedback wrong';
+        return;
+      }
+      piece.placed = true;
+      piece.placedOrigin = [r, c];
+      selectedId = -1;
+      puzzleFeedbackEl.textContent = '';
+      puzzleFeedbackEl.className = 'puzzle-feedback';
+      render();
+      if (shapesIsSolved(p)) {
+        solvePuzzle();
+        render();
+      }
+    }
+
+    function onTrayPieceClick(pieceId) {
+      if (p.solved) return;
+      selectedId = selectedId === pieceId ? -1 : pieceId;
+      render();
+    }
+
+    function renderGrid() {
+      shapesGridEl.innerHTML = '';
+      shapesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', 38px)';
+      shapesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', 38px)';
+      const covered = shapesCoverage(p);
+      for (let r = 0; r < p.rows; r++) {
+        for (let c = 0; c < p.cols; c++) {
+          const pieceId = covered[r * p.cols + c];
+          const cell = document.createElement('button');
+          cell.className = 'shapes-cell' + (pieceId !== null ? ' filled' : '');
+          if (pieceId !== null) {
+            cell.style.background = p.pieces.find((pc) => pc.id === pieceId).color;
+          }
+          cell.disabled = p.solved;
+          cell.addEventListener('click', () => onGridCellClick(r, c));
+          shapesGridEl.appendChild(cell);
+        }
+      }
+    }
+
+    function renderTray() {
+      shapesTrayEl.innerHTML = '';
+      p.pieces.filter((pc) => !pc.placed).forEach((piece) => {
+        const maxR = Math.max(...piece.currentCells.map(([r]) => r));
+        const maxC = Math.max(...piece.currentCells.map(([, c]) => c));
+        const cellSet = new Set(piece.currentCells.map(([r, c]) => r + ',' + c));
+        const wrap = document.createElement('div');
+        wrap.className = 'shapes-piece' + (piece.id === selectedId ? ' selected' : '');
+        wrap.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 14px)';
+        wrap.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', 14px)';
+        for (let r = 0; r <= maxR; r++) {
+          for (let c = 0; c <= maxC; c++) {
+            const cellEl = document.createElement('div');
+            cellEl.className = 'shapes-piece-cell';
+            cellEl.style.background = cellSet.has(r + ',' + c) ? piece.color : 'transparent';
+            wrap.appendChild(cellEl);
+          }
+        }
+        wrap.addEventListener('click', () => onTrayPieceClick(piece.id));
+        shapesTrayEl.appendChild(wrap);
+      });
+    }
+
+    function render() {
+      renderGrid();
+      renderTray();
+      updateRotateButton();
+    }
+
+    shapesRotateEl.onclick = () => {
+      if (p.solved || selectedId === -1) return;
+      const piece = p.pieces.find((pc) => pc.id === selectedId);
+      if (!piece) return;
+      piece.currentCells = rotatePieceCells(piece.currentCells);
+      render();
+    };
+
+    render();
+
+    puzzleAgainEl.onclick = () => {
+      if (opts.onRetry) opts.onRetry();
+    };
+  }
+
   function openTestPuzzle(type) {
     const game = MINI_GAMES[type];
     let content = null;
@@ -3464,7 +3914,7 @@
       const target = 1 + Math.floor(Math.random() * CARD_COUNT);
       const makers = {
         cryptogram: makeCryptogramPuzzle, cipher: makeCipherPuzzle,
-        slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle,
+        slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle, shapes: makeShapesPuzzle,
       };
       content = {
         isStory: false,
