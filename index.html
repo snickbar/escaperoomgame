@@ -142,6 +142,24 @@
     border-color: #7a8194;
   }
 
+  .table-hint-btn {
+    display: block;
+    margin: 0 auto 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.5);
+    border-radius: 8px;
+    color: #ffc107;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    padding: 6px 14px;
+  }
+
+  .table-hint-btn:hover {
+    background: rgba(255, 193, 7, 0.2);
+  }
+
   .home-link:hover {
     color: #cfd3dc;
   }
@@ -1133,6 +1151,7 @@
 
 <div id="gameScreen" hidden>
   <button class="home-link" id="homeLink">&larr; Back to decks</button>
+  <button class="table-hint-btn" id="tableHintBtn">&#128161; Hint</button>
   <button class="debug-next-btn" id="debugNextBtn">&#128269; Debug: next card</button>
   <h1 id="gameTitle">Escape Room Card Game</h1>
 
@@ -1703,6 +1722,7 @@
   const gameScreenEl = document.getElementById('gameScreen');
   const gameTitleEl = document.getElementById('gameTitle');
   const homeLinkEl = document.getElementById('homeLink');
+  const tableHintBtnEl = document.getElementById('tableHintBtn');
   const debugNextBtnEl = document.getElementById('debugNextBtn');
 
   const miniGamesScreenEl = document.getElementById('miniGamesScreen');
@@ -1900,6 +1920,63 @@
     } else {
       showToast(currentTarget != null ? ('Next card: ' + currentTarget) : 'No target — deal the deck or you already won.', 4000);
     }
+  });
+
+  // Returns true if `target` is currently unlocked, but every card that
+  // unlocked it is a puzzle the player hasn't solved yet -- highlighting it
+  // would just hand over the puzzle's answer instead of helping them find
+  // a card they already legitimately know about.
+  function isTargetPuzzleGated(target) {
+    if (target == null) return false;
+    let hasLegitimateSource = false;
+    let hasAnySource = false;
+    cardContent.forEach((c, sourceNum) => {
+      const unlocksThis = currentMode === 'story'
+        ? (c.unlocks && c.unlocks.includes(target))
+        : (c.next === target);
+      if (!unlocksThis) return;
+      const sourceEl = document.querySelector('.card[data-number="' + sourceNum + '"]');
+      if (!sourceEl || !sourceEl.classList.contains('flipped')) return;
+      hasAnySource = true;
+      if (!(c.puzzle && !c.puzzle.solved)) hasLegitimateSource = true;
+    });
+    return hasAnySource && !hasLegitimateSource;
+  }
+
+  function clearTableHintHighlight() {
+    document.querySelectorAll('.card.hinted').forEach((el) => el.classList.remove('hinted'));
+  }
+
+  function highlightCardOnTable(num) {
+    clearTableHintHighlight();
+    const cardEl = document.querySelector('.card[data-number="' + num + '"]');
+    if (!cardEl) return;
+    cardEl.classList.add('hinted');
+    cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // Player-facing hint (unlike the debug button above): highlights one
+  // already-unlocked card on the table so it's easy to spot among a big
+  // spread, but refuses when the only unlocked option is still locked
+  // behind an unsolved puzzle — open that puzzle instead, where its own
+  // Hint button can help solve it.
+  tableHintBtnEl.addEventListener('click', () => {
+    if (!currentMode) {
+      showToast('Deal a deck first.');
+      return;
+    }
+    const rawCandidates = currentMode === 'story'
+      ? Array.from(unlockedNumbers)
+      : (currentTarget != null ? [currentTarget] : []);
+    const candidates = rawCandidates.filter((n) => !isTargetPuzzleGated(n));
+    if (!candidates.length) {
+      showToast(rawCandidates.length
+        ? '\u{1F4A1} No hints available — solve the open puzzle first!'
+        : 'Nothing to hint yet.');
+      return;
+    }
+    highlightCardOnTable(pickRandom(candidates));
+    showToast('\u{1F4A1} Hint: watch for the glowing card!');
   });
 
   function triggerWrongFeedback(card) {
@@ -2411,6 +2488,7 @@
       `;
 
       card.addEventListener('click', () => {
+        clearTableHintHighlight();
         if (card.classList.contains('flipped')) {
           openZoom(num);
           return;
