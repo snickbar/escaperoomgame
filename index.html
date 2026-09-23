@@ -991,38 +991,19 @@
     height: 38px;
     border-radius: 4px;
     background: rgba(255, 255, 255, 0.06);
-    border: none;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .shapes-cell:hover {
-    background: rgba(255, 255, 255, 0.12);
   }
 
   .shapes-cell.filled {
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none;
   }
 
-  .shapes-rotate {
-    border: none;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    color: #d8f5e6;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-family: inherit;
+  .shapes-cell.preview-valid {
+    box-shadow: 0 0 0 2px #7ee6a8 inset;
   }
 
-  .shapes-rotate:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.18);
-  }
-
-  .shapes-rotate:disabled {
-    opacity: 0.4;
-    cursor: default;
+  .shapes-cell.preview-invalid {
+    box-shadow: 0 0 0 2px #ff9a9a inset;
   }
 
   .shapes-tray {
@@ -1039,20 +1020,28 @@
     gap: 1px;
     padding: 3px;
     border-radius: 6px;
-    border: 2px solid transparent;
     background: rgba(255, 255, 255, 0.04);
-    cursor: pointer;
-  }
-
-  .shapes-piece.selected {
-    border-color: #ffd76a;
-    background: rgba(255, 215, 106, 0.12);
+    cursor: grab;
+    touch-action: none;
   }
 
   .shapes-piece-cell {
     width: 14px;
     height: 14px;
     border-radius: 2px;
+  }
+
+  .shapes-ghost {
+    position: fixed;
+    display: grid;
+    gap: 2px;
+    pointer-events: none;
+    z-index: 2000;
+    opacity: 0.9;
+  }
+
+  .shapes-ghost-cell {
+    border-radius: 4px;
   }
 
   .puzzle-feedback {
@@ -1397,7 +1386,6 @@
       <div class="pipes-grid" id="pipesGrid" hidden></div>
       <div class="shapes-area" id="shapesArea" hidden>
         <div class="shapes-grid" id="shapesGrid"></div>
-        <button class="shapes-rotate" id="shapesRotate">&#128260; Rotate</button>
         <div class="shapes-tray" id="shapesTray"></div>
       </div>
       <button class="puzzle-hint" id="puzzleHint">&#128161; Hint (2)</button>
@@ -2296,7 +2284,6 @@
   const pipesGridEl = document.getElementById('pipesGrid');
   const shapesAreaEl = document.getElementById('shapesArea');
   const shapesGridEl = document.getElementById('shapesGrid');
-  const shapesRotateEl = document.getElementById('shapesRotate');
   const shapesTrayEl = document.getElementById('shapesTray');
   const puzzleInstructionsEl = document.getElementById('puzzleInstructions');
   const puzzleFeedbackEl = document.getElementById('puzzleFeedback');
@@ -3714,6 +3701,10 @@
     };
   }
 
+  const SHAPES_CELL_PX = 38;
+  const SHAPES_GRID_PAD_PX = 4;
+  const SHAPES_GRID_PITCH_PX = SHAPES_CELL_PX + 2; // cell + gap
+
   function renderShapesPuzzle(content, num, opts) {
     opts = opts || {};
     const isTest = !!opts.isTest;
@@ -3726,8 +3717,8 @@
     pipesGridEl.hidden = true;
     shapesAreaEl.hidden = false;
 
-    puzzleInstructionsEl.textContent = 'Tap a piece below to select it, Rotate if needed, ' +
-      'then tap a spot on the board to place it. Tap a placed piece to pick it back up.';
+    puzzleInstructionsEl.textContent = 'Drag a piece onto the board — it’ll snap into place ' +
+      'if it fits. Tap a piece (without dragging) to rotate it.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3746,15 +3737,11 @@
     updateHintButton();
     puzzleHintEl.onclick = useHint;
 
-    let selectedId = -1;
+    let drag = null; // { piece, pointerId, startX, startY, originalOrigin, ghostEl, widthPx, heightPx, moved, candidateRow, candidateCol }
 
     function updateHintButton() {
       puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
       puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
-    }
-
-    function updateRotateButton() {
-      shapesRotateEl.disabled = p.solved || selectedId === -1;
     }
 
     // Places one unplaced piece straight into its original solved slot, if
@@ -3771,7 +3758,6 @@
       candidate.placed = true;
       candidate.placedOrigin = candidate.solvedOrigin;
       p.hintsRemaining--;
-      selectedId = -1;
       updateHintButton();
       render();
       if (shapesIsSolved(p)) {
@@ -3782,9 +3768,7 @@
 
     function solvePuzzle() {
       p.solved = true;
-      selectedId = -1;
       updateHintButton();
-      updateRotateButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
       if (isTest) {
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
@@ -3802,33 +3786,106 @@
       }
     }
 
-    function onGridCellClick(r, c) {
+    function buildGhost(piece) {
+      const maxR = Math.max(...piece.currentCells.map(([r]) => r));
+      const maxC = Math.max(...piece.currentCells.map(([, c]) => c));
+      const cellSet = new Set(piece.currentCells.map(([r, c]) => r + ',' + c));
+      const ghost = document.createElement('div');
+      ghost.className = 'shapes-ghost';
+      ghost.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', ' + SHAPES_CELL_PX + 'px)';
+      ghost.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', ' + SHAPES_CELL_PX + 'px)';
+      for (let r = 0; r <= maxR; r++) {
+        for (let c = 0; c <= maxC; c++) {
+          const cellEl = document.createElement('div');
+          cellEl.className = 'shapes-ghost-cell';
+          cellEl.style.background = cellSet.has(r + ',' + c) ? piece.color : 'transparent';
+          ghost.appendChild(cellEl);
+        }
+      }
+      document.body.appendChild(ghost);
+      return { ghost, widthPx: (maxC + 1) * SHAPES_CELL_PX, heightPx: (maxR + 1) * SHAPES_CELL_PX };
+    }
+
+    function positionGhost(clientX, clientY) {
+      drag.ghostEl.style.left = (clientX - drag.widthPx / 2) + 'px';
+      drag.ghostEl.style.top = (clientY - drag.heightPx / 2) + 'px';
+    }
+
+    function candidateOrigin(clientX, clientY) {
+      const rect = shapesGridEl.getBoundingClientRect();
+      const localX = clientX - drag.widthPx / 2 - rect.left - SHAPES_GRID_PAD_PX;
+      const localY = clientY - drag.heightPx / 2 - rect.top - SHAPES_GRID_PAD_PX;
+      return [Math.round(localY / SHAPES_GRID_PITCH_PX), Math.round(localX / SHAPES_GRID_PITCH_PX)];
+    }
+
+    function startDrag(piece, evt) {
       if (p.solved) return;
-      const covered = shapesCoverage(p);
-      const pieceId = covered[r * p.cols + c];
-      if (pieceId !== null) {
-        const piece = p.pieces.find((pc) => pc.id === pieceId);
-        piece.placed = false;
-        piece.placedOrigin = null;
-        selectedId = piece.id;
-        puzzleFeedbackEl.textContent = '';
-        puzzleFeedbackEl.className = 'puzzle-feedback';
+      evt.preventDefault();
+      const originalOrigin = piece.placedOrigin;
+      piece.placed = false;
+      piece.placedOrigin = null;
+      const { ghost, widthPx, heightPx } = buildGhost(piece);
+      drag = {
+        piece, pointerId: evt.pointerId, startX: evt.clientX, startY: evt.clientY,
+        originalOrigin, ghostEl: ghost, widthPx, heightPx, moved: false,
+      };
+      positionGhost(evt.clientX, evt.clientY);
+      render();
+      window.addEventListener('pointermove', onDragMove);
+      window.addEventListener('pointerup', onDragEnd);
+      window.addEventListener('pointercancel', onDragEnd);
+    }
+
+    function onDragMove(evt) {
+      if (!drag || evt.pointerId !== drag.pointerId) return;
+      positionGhost(evt.clientX, evt.clientY);
+      if (Math.abs(evt.clientX - drag.startX) > 6 || Math.abs(evt.clientY - drag.startY) > 6) {
+        drag.moved = true;
+      }
+      const [row, col] = candidateOrigin(evt.clientX, evt.clientY);
+      drag.candidateRow = row;
+      drag.candidateCol = col;
+      renderGrid();
+    }
+
+    function endDrag() {
+      window.removeEventListener('pointermove', onDragMove);
+      window.removeEventListener('pointerup', onDragEnd);
+      window.removeEventListener('pointercancel', onDragEnd);
+      drag.ghostEl.remove();
+    }
+
+    function onDragEnd(evt) {
+      if (!drag || evt.pointerId !== drag.pointerId) return;
+      const { piece, moved, originalOrigin, candidateRow, candidateCol } = drag;
+      endDrag();
+      drag = null;
+
+      if (!moved) {
+        // A tap, not a drag: rotate in place, and try to settle back where
+        // it was (a placed piece might no longer fit there once rotated).
+        piece.currentCells = rotatePieceCells(piece.currentCells);
+        if (originalOrigin) {
+          const covered = shapesCoverage(p);
+          if (shapesCanPlace(piece, originalOrigin[0], originalOrigin[1], p.rows, p.cols, covered)) {
+            piece.placed = true;
+            piece.placedOrigin = originalOrigin;
+          }
+        }
         render();
         return;
       }
-      if (selectedId === -1) return;
-      const piece = p.pieces.find((pc) => pc.id === selectedId);
-      if (!piece || piece.placed) return;
-      if (!shapesCanPlace(piece, r, c, p.rows, p.cols, covered)) {
+
+      const covered = shapesCoverage(p);
+      if (candidateRow !== undefined && shapesCanPlace(piece, candidateRow, candidateCol, p.rows, p.cols, covered)) {
+        piece.placed = true;
+        piece.placedOrigin = [candidateRow, candidateCol];
+        puzzleFeedbackEl.textContent = '';
+        puzzleFeedbackEl.className = 'puzzle-feedback';
+      } else {
         puzzleFeedbackEl.textContent = 'Doesn’t fit there!';
         puzzleFeedbackEl.className = 'puzzle-feedback wrong';
-        return;
       }
-      piece.placed = true;
-      piece.placedOrigin = [r, c];
-      selectedId = -1;
-      puzzleFeedbackEl.textContent = '';
-      puzzleFeedbackEl.className = 'puzzle-feedback';
       render();
       if (shapesIsSolved(p)) {
         solvePuzzle();
@@ -3836,27 +3893,38 @@
       }
     }
 
-    function onTrayPieceClick(pieceId) {
-      if (p.solved) return;
-      selectedId = selectedId === pieceId ? -1 : pieceId;
-      render();
-    }
-
     function renderGrid() {
       shapesGridEl.innerHTML = '';
-      shapesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', 38px)';
-      shapesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', 38px)';
+      shapesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', ' + SHAPES_CELL_PX + 'px)';
+      shapesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', ' + SHAPES_CELL_PX + 'px)';
       const covered = shapesCoverage(p);
+
+      let previewCells = null;
+      let previewValid = false;
+      if (drag && drag.candidateRow !== undefined) {
+        previewValid = shapesCanPlace(
+          { currentCells: drag.piece.currentCells }, drag.candidateRow, drag.candidateCol, p.rows, p.cols, covered
+        );
+        previewCells = new Set(drag.piece.currentCells.map(([dr, dc]) =>
+          (drag.candidateRow + dr) + ',' + (drag.candidateCol + dc)));
+      }
+
       for (let r = 0; r < p.rows; r++) {
         for (let c = 0; c < p.cols; c++) {
+          const key = r + ',' + c;
           const pieceId = covered[r * p.cols + c];
-          const cell = document.createElement('button');
+          const cell = document.createElement('div');
           cell.className = 'shapes-cell' + (pieceId !== null ? ' filled' : '');
           if (pieceId !== null) {
-            cell.style.background = p.pieces.find((pc) => pc.id === pieceId).color;
+            const piece = p.pieces.find((pc) => pc.id === pieceId);
+            cell.style.background = piece.color;
+            if (!p.solved) {
+              cell.addEventListener('pointerdown', (evt) => startDrag(piece, evt));
+            }
           }
-          cell.disabled = p.solved;
-          cell.addEventListener('click', () => onGridCellClick(r, c));
+          if (previewCells && previewCells.has(key)) {
+            cell.classList.add(previewValid ? 'preview-valid' : 'preview-invalid');
+          }
           shapesGridEl.appendChild(cell);
         }
       }
@@ -3869,7 +3937,7 @@
         const maxC = Math.max(...piece.currentCells.map(([, c]) => c));
         const cellSet = new Set(piece.currentCells.map(([r, c]) => r + ',' + c));
         const wrap = document.createElement('div');
-        wrap.className = 'shapes-piece' + (piece.id === selectedId ? ' selected' : '');
+        wrap.className = 'shapes-piece';
         wrap.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 14px)';
         wrap.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', 14px)';
         for (let r = 0; r <= maxR; r++) {
@@ -3880,7 +3948,7 @@
             wrap.appendChild(cellEl);
           }
         }
-        wrap.addEventListener('click', () => onTrayPieceClick(piece.id));
+        wrap.addEventListener('pointerdown', (evt) => startDrag(piece, evt));
         shapesTrayEl.appendChild(wrap);
       });
     }
@@ -3888,16 +3956,7 @@
     function render() {
       renderGrid();
       renderTray();
-      updateRotateButton();
     }
-
-    shapesRotateEl.onclick = () => {
-      if (p.solved || selectedId === -1) return;
-      const piece = p.pieces.find((pc) => pc.id === selectedId);
-      if (!piece) return;
-      piece.currentCells = rotatePieceCells(piece.currentCells);
-      render();
-    };
 
     render();
 
