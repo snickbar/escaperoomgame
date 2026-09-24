@@ -1058,6 +1058,10 @@
     color: #ff9a9a;
   }
 
+  .puzzle-feedback.hint {
+    color: #ffd76a;
+  }
+
   .puzzle-again {
     border: none;
     border-radius: 8px;
@@ -3806,6 +3810,7 @@
     puzzleHintEl.onclick = useHint;
 
     let drag = null; // { piece, pointerId, startX, startY, originalOrigin, ghostEl, widthPx, heightPx, moved, candidateRow, candidateCol }
+    let hintedPieceId = null;
 
     function updateHintButton() {
       puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
@@ -3815,6 +3820,9 @@
     // Places one unplaced piece straight into its original solved slot, if
     // that slot happens to still be free (it might not be, if the player's
     // built an alternate arrangement) — tries each unplaced piece in turn.
+    // The dropped-in piece pulses gold (matching every other puzzle's hint
+    // treatment) until the player's next move, plus an explicit message,
+    // so it's obvious a piece just got placed for them and which one.
     function useHint() {
       if (p.solved || p.hintsRemaining <= 0) return;
       const covered = shapesCoverage(p);
@@ -3826,6 +3834,9 @@
       candidate.placed = true;
       candidate.placedOrigin = candidate.solvedOrigin;
       p.hintsRemaining--;
+      hintedPieceId = candidate.id;
+      puzzleFeedbackEl.textContent = '\u{1F4A1} Hint used — placed a piece for you!';
+      puzzleFeedbackEl.className = 'puzzle-feedback hint';
       updateHintButton();
       render();
       if (shapesIsSolved(p)) {
@@ -3889,6 +3900,9 @@
     function startDrag(piece, evt) {
       if (p.solved) return;
       evt.preventDefault();
+      hintedPieceId = null;
+      puzzleFeedbackEl.textContent = '';
+      puzzleFeedbackEl.className = 'puzzle-feedback';
       const originalOrigin = piece.placedOrigin;
       piece.placed = false;
       piece.placedOrigin = null;
@@ -3982,7 +3996,8 @@
           const key = r + ',' + c;
           const pieceId = covered[r * p.cols + c];
           const cell = document.createElement('div');
-          cell.className = 'shapes-cell' + (pieceId !== null ? ' filled' : '');
+          cell.className = 'shapes-cell' + (pieceId !== null ? ' filled' : '') +
+            (pieceId !== null && pieceId === hintedPieceId ? ' hinted' : '');
           if (pieceId !== null) {
             const piece = p.pieces.find((pc) => pc.id === pieceId);
             cell.style.background = piece.color;
