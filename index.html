@@ -2050,16 +2050,6 @@
   const SHAPES_MAX_PIECE_SIZE = 6;
   const SHAPES_PALETTE = ['#4caf7d', '#4c9df0', '#e0a34c', '#e05252', '#b98cf0', '#4cc9c9', '#ffd76a'];
 
-  // 90-degree clockwise rotation of a normalized (min row/col = 0) cell
-  // list, re-normalized so the result is always min row/col = 0 too.
-  function rotatePieceCells(cells) {
-    const maxR = Math.max(...cells.map(([r]) => r));
-    const rotated = cells.map(([r, c]) => [c, maxR - r]);
-    const minR = Math.min(...rotated.map(([r]) => r));
-    const minC = Math.min(...rotated.map(([, c]) => c));
-    return rotated.map(([r, c]) => [r - minR, c - minC]);
-  }
-
   // Fills the whole grid with connected pieces, growing each one cell by
   // cell from a random unassigned start toward targetSize (accepting a
   // smaller leftover piece if growth gets boxed in) — every cell always
@@ -2237,23 +2227,6 @@
     return best;
   }
 
-  // A piece's own bounding box is always <= the board (its cells came from
-  // carving the board itself) - but ROTATING it swaps that box's width and
-  // height, and on a non-square board that can push it past one edge, even
-  // though rotating it again would bring it back into bounds. Shown at a
-  // rotation like that, a piece can look flat-out too big for the board
-  // when it isn't. Restrict the random initial rotation to only the ones
-  // that actually fit, so that never happens.
-  function shapesFittingRotations(solvedCells, rows, cols) {
-    const states = [solvedCells];
-    for (let s = 1; s < 4; s++) states.push(rotatePieceCells(states[s - 1]));
-    return states.filter((cells) => {
-      const maxR = Math.max(...cells.map(([r]) => r));
-      const maxC = Math.max(...cells.map(([, c]) => c));
-      return maxR < rows && maxC < cols;
-    });
-  }
-
   function makeShapesPuzzle(target) {
     const rawPieces = buildShapesTiling(SHAPES_ROWS, SHAPES_COLS, SHAPES_TARGET_PIECE_SIZE);
     const pieces = rawPieces.map((cells, i) => {
@@ -2261,7 +2234,9 @@
       const minC = Math.min(...cells.map(([, c]) => c));
       const solvedCells = cells.map(([r, c]) => [r - minR, c - minC]);
       const solvedOrigin = [minR, minC];
-      const currentCells = pickRandom(shapesFittingRotations(solvedCells, SHAPES_ROWS, SHAPES_COLS));
+      // No rotation in this puzzle, so a piece has to start out already in
+      // the one orientation it can ever be placed in.
+      const currentCells = solvedCells;
       return {
         id: i,
         color: SHAPES_PALETTE[i % SHAPES_PALETTE.length],
@@ -3816,7 +3791,7 @@
     shapesAreaEl.hidden = false;
 
     puzzleInstructionsEl.textContent = 'Drag a piece onto the board — it’ll snap into place ' +
-      'if it fits. Tap a piece (without dragging) to rotate it.';
+      'if it fits nearby.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3970,15 +3945,11 @@
       drag = null;
 
       if (!moved) {
-        // A tap, not a drag: rotate in place, and try to settle back where
-        // it was (a placed piece might no longer fit there once rotated).
-        piece.currentCells = rotatePieceCells(piece.currentCells);
+        // A tap, not a drag: there's nothing to rotate, so just settle the
+        // piece back exactly where it was.
         if (originalOrigin) {
-          const covered = shapesCoverage(p);
-          if (shapesCanPlace(piece, originalOrigin[0], originalOrigin[1], p.rows, p.cols, covered)) {
-            piece.placed = true;
-            piece.placedOrigin = originalOrigin;
-          }
+          piece.placed = true;
+          piece.placedOrigin = originalOrigin;
         }
         render();
         return;
