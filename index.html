@@ -2211,6 +2211,32 @@
     return p.pieces.every((piece) => piece.placed);
   }
 
+  // Dragging a piece to line up pixel-exactly with the one right cell it
+  // belongs at is fiddly, especially for bigger/irregular shapes — this
+  // looks at the cell the pointer landed on first, then a widening ring of
+  // neighbors, and snaps to the closest one that actually fits. Used for
+  // both the live drag preview and the real drop, so what you see is what
+  // you get.
+  function shapesFindSnapOrigin(piece, row, col, rows, cols, covered, radius) {
+    if (shapesCanPlace(piece, row, col, rows, cols, covered)) return [row, col];
+    let best = null;
+    let bestDist = Infinity;
+    for (let dr = -radius; dr <= radius; dr++) {
+      for (let dc = -radius; dc <= radius; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const r = row + dr;
+        const c = col + dc;
+        if (!shapesCanPlace(piece, r, c, rows, cols, covered)) continue;
+        const dist = dr * dr + dc * dc;
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = [r, c];
+        }
+      }
+    }
+    return best;
+  }
+
   // A piece's own bounding box is always <= the board (its cells came from
   // carving the board itself) - but ROTATING it swaps that box's width and
   // height, and on a non-square board that can push it past one edge, even
@@ -3959,9 +3985,12 @@
       }
 
       const covered = shapesCoverage(p);
-      if (candidateRow !== undefined && shapesCanPlace(piece, candidateRow, candidateCol, p.rows, p.cols, covered)) {
+      const snapOrigin = candidateRow !== undefined
+        ? shapesFindSnapOrigin(piece, candidateRow, candidateCol, p.rows, p.cols, covered, 1)
+        : null;
+      if (snapOrigin) {
         piece.placed = true;
-        piece.placedOrigin = [candidateRow, candidateCol];
+        piece.placedOrigin = snapOrigin;
         puzzleFeedbackEl.textContent = '';
         puzzleFeedbackEl.className = 'puzzle-feedback';
       } else {
@@ -3984,11 +4013,12 @@
       let previewCells = null;
       let previewValid = false;
       if (drag && drag.candidateRow !== undefined) {
-        previewValid = shapesCanPlace(
-          { currentCells: drag.piece.currentCells }, drag.candidateRow, drag.candidateCol, p.rows, p.cols, covered
+        const snapOrigin = shapesFindSnapOrigin(
+          { currentCells: drag.piece.currentCells }, drag.candidateRow, drag.candidateCol, p.rows, p.cols, covered, 1
         );
-        previewCells = new Set(drag.piece.currentCells.map(([dr, dc]) =>
-          (drag.candidateRow + dr) + ',' + (drag.candidateCol + dc)));
+        previewValid = !!snapOrigin;
+        const [pr, pc] = snapOrigin || [drag.candidateRow, drag.candidateCol];
+        previewCells = new Set(drag.piece.currentCells.map(([dr, dc]) => (pr + dr) + ',' + (pc + dc)));
       }
 
       for (let r = 0; r < p.rows; r++) {
