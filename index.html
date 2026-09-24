@@ -2043,6 +2043,7 @@
   const SHAPES_ROWS = 5;
   const SHAPES_COLS = 4;
   const SHAPES_TARGET_PIECE_SIZE = 4;
+  const SHAPES_MAX_PIECE_SIZE = 6;
   const SHAPES_PALETTE = ['#4caf7d', '#4c9df0', '#e0a34c', '#e05252', '#b98cf0', '#4cc9c9', '#ffd76a'];
 
   // 90-degree clockwise rotation of a normalized (min row/col = 0) cell
@@ -2089,38 +2090,90 @@
       }
       pieces.push(cells);
     }
-    return mergeSmallShapePieces(pieces, rows, cols, targetSize);
+    return mergeSmallShapePieces(pieces, rows, cols, targetSize, SHAPES_MAX_PIECE_SIZE);
+  }
+
+  function shapeCellsConnected(cells) {
+    if (cells.length <= 1) return true;
+    const key = ([r, c]) => r + ',' + c;
+    const set = new Set(cells.map(key));
+    const visited = new Set([key(cells[0])]);
+    const queue = [cells[0]];
+    while (queue.length) {
+      const [r, c] = queue.shift();
+      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+        const k = key([r + dr, c + dc]);
+        if (set.has(k) && !visited.has(k)) {
+          visited.add(k);
+          queue.push([r + dr, c + dc]);
+        }
+      }
+    }
+    return visited.size === cells.length;
   }
 
   // The growth pass above can strand small leftover fragments (even single
-  // cells) once neighboring pieces box them in. Folds anything under
-  // minSize into a piece it's touching, looping until nothing's left too
-  // small — pieces can end up a bit bigger than targetSize as a result,
-  // but never smaller, which reads much more like real Tetris pieces.
-  function mergeSmallShapePieces(pieces, rows, cols, minSize) {
+  // cells) once neighboring pieces box them in. Grows anything under
+  // minSize by stealing one boundary cell at a time from a touching piece
+  // (preferring the biggest neighbor, and skipping any cell whose removal
+  // would split that donor into two disconnected pieces), looping until
+  // nothing's left too small. One cell at a time keeps sizes tight around
+  // minSize instead of a run of orphans dumping into one oversized piece —
+  // capped at maxSize, though a piece can still end up a little bigger in
+  // the rare case where its only neighbor can't safely spare a single cell
+  // without disconnecting.
+  function mergeSmallShapePieces(pieces, rows, cols, minSize, maxSize) {
     const idx = (r, c) => r * cols + c;
     let list = pieces.map((cells) => cells.slice());
     let changed = true;
-    while (changed) {
+    let guard = 0;
+    while (changed && guard < rows * cols * 4) {
       changed = false;
+      guard++;
       const owner = new Array(rows * cols).fill(-1);
       list.forEach((cells, pi) => cells.forEach(([r, c]) => { owner[idx(r, c)] = pi; }));
 
       for (let pi = 0; pi < list.length; pi++) {
         if (list[pi].length >= minSize) continue;
-        let mergeTarget = -1;
+        const candidates = [];
         for (const [r, c] of list[pi]) {
           for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
             const nr = r + dr;
             const nc = c + dc;
             if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
             const oi = owner[idx(nr, nc)];
-            if (oi !== -1 && oi !== pi) { mergeTarget = oi; break; }
+            if (oi !== -1 && oi !== pi) candidates.push({ donorIdx: oi, cell: [nr, nc] });
           }
-          if (mergeTarget !== -1) break;
         }
-        if (mergeTarget === -1) continue;
-        list[mergeTarget] = list[mergeTarget].concat(list[pi]);
+        if (!candidates.length) continue;
+        candidates.sort((a, b) => list[b.donorIdx].length - list[a.donorIdx].length);
+
+        // Only steal from a donor that stays at or above minSize afterward —
+        // otherwise the donor would itself need to grow again later, and
+        // could end up stealing right back from pi, oscillating forever
+        // instead of ever converging.
+        let stole = false;
+        for (const cand of candidates) {
+          if (list[pi].length >= maxSize) break;
+          const donorCells = list[cand.donorIdx];
+          if (donorCells.length - 1 < minSize) continue;
+          const remaining = donorCells.filter(([r, c]) => !(r === cand.cell[0] && c === cand.cell[1]));
+          if (!shapeCellsConnected(remaining)) continue;
+          list[pi] = list[pi].concat([cand.cell]);
+          list[cand.donorIdx] = remaining;
+          stole = true;
+          changed = true;
+          break;
+        }
+        if (stole) break;
+
+        // No single-cell steal was safe (every candidate donor would split) —
+        // fall back to absorbing the smallest whole neighbor so this piece
+        // still makes progress and the loop can't stall forever.
+        const smallest = candidates.map((c) => c.donorIdx)
+          .filter((v, i, arr) => arr.indexOf(v) === i)
+          .sort((a, b) => list[a].length - list[b].length)[0];
+        list[smallest] = list[smallest].concat(list[pi]);
         list.splice(pi, 1);
         changed = true;
         break;
@@ -2154,6 +2207,23 @@
     return p.pieces.every((piece) => piece.placed);
   }
 
+  // A piece's own bounding box is always <= the board (its cells came from
+  // carving the board itself) - but ROTATING it swaps that box's width and
+  // height, and on a non-square board that can push it past one edge, even
+  // though rotating it again would bring it back into bounds. Shown at a
+  // rotation like that, a piece can look flat-out too big for the board
+  // when it isn't. Restrict the random initial rotation to only the ones
+  // that actually fit, so that never happens.
+  function shapesFittingRotations(solvedCells, rows, cols) {
+    const states = [solvedCells];
+    for (let s = 1; s < 4; s++) states.push(rotatePieceCells(states[s - 1]));
+    return states.filter((cells) => {
+      const maxR = Math.max(...cells.map(([r]) => r));
+      const maxC = Math.max(...cells.map(([, c]) => c));
+      return maxR < rows && maxC < cols;
+    });
+  }
+
   function makeShapesPuzzle(target) {
     const rawPieces = buildShapesTiling(SHAPES_ROWS, SHAPES_COLS, SHAPES_TARGET_PIECE_SIZE);
     const pieces = rawPieces.map((cells, i) => {
@@ -2161,9 +2231,7 @@
       const minC = Math.min(...cells.map(([, c]) => c));
       const solvedCells = cells.map(([r, c]) => [r - minR, c - minC]);
       const solvedOrigin = [minR, minC];
-      const initialRotation = Math.floor(Math.random() * 4);
-      let currentCells = solvedCells;
-      for (let s = 0; s < initialRotation; s++) currentCells = rotatePieceCells(currentCells);
+      const currentCells = pickRandom(shapesFittingRotations(solvedCells, SHAPES_ROWS, SHAPES_COLS));
       return {
         id: i,
         color: SHAPES_PALETTE[i % SHAPES_PALETTE.length],
