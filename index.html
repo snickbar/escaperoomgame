@@ -2044,8 +2044,16 @@
 
   // --- Shapes puzzle: fit polyomino pieces into a rectangle ---
 
-  const SHAPES_ROWS = 5;
-  const SHAPES_COLS = 4;
+  // Board size varies puzzle to puzzle (20-30 cells), keeping a portrait-ish
+  // or square shape rather than ever going wide, so it still reads well in
+  // the card's narrow layout.
+  const SHAPES_SIZE_OPTIONS = [
+    { rows: 5, cols: 4 }, // 20
+    { rows: 6, cols: 4 }, // 24
+    { rows: 7, cols: 4 }, // 28
+    { rows: 5, cols: 5 }, // 25
+    { rows: 6, cols: 5 }, // 30
+  ];
   const SHAPES_TARGET_PIECE_SIZE = 4;
   const SHAPES_MAX_PIECE_SIZE = 6;
   const SHAPES_PALETTE = ['#4caf7d', '#4c9df0', '#e0a34c', '#e05252', '#b98cf0', '#4cc9c9', '#ffd76a'];
@@ -2228,7 +2236,8 @@
   }
 
   function makeShapesPuzzle(target) {
-    const rawPieces = buildShapesTiling(SHAPES_ROWS, SHAPES_COLS, SHAPES_TARGET_PIECE_SIZE);
+    const { rows, cols } = pickRandom(SHAPES_SIZE_OPTIONS);
+    const rawPieces = buildShapesTiling(rows, cols, SHAPES_TARGET_PIECE_SIZE);
     const pieces = rawPieces.map((cells, i) => {
       const minR = Math.min(...cells.map(([r]) => r));
       const minC = Math.min(...cells.map(([, c]) => c));
@@ -2250,8 +2259,8 @@
 
     return {
       type: 'shapes',
-      rows: SHAPES_ROWS,
-      cols: SHAPES_COLS,
+      rows,
+      cols,
       pieces,
       answer: target,
       solved: false,
