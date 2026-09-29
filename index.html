@@ -1562,14 +1562,14 @@
       id: 'pipes',
       label: 'Pipes',
       icon: '\u{1F6B0}',
-      tagline: 'Rotate tiles in place to connect start to end (not in regular play yet)',
+      tagline: 'Rotate tiles in place to connect start to end',
       accent: '#4cc9c9',
     },
     shapes: {
       id: 'shapes',
       label: 'Shapes',
       icon: '\u{1F7EA}',
-      tagline: 'Fit the pieces into the board (not in regular play yet)',
+      tagline: 'Fit the pieces into the board',
       accent: '#b98cf0',
     },
   };
@@ -2288,6 +2288,8 @@
   const PUZZLE_GENERATORS = [
     { make: makeCryptogramPuzzle, hint: '\u{1F9E9} Solve the puzzle to find your next card!' },
     { make: makeSwapPuzzle, hint: '\u{1F522} Solve the number puzzle to find your next card!' },
+    { make: makeShapesPuzzle, hint: '\u{1F7EA} Fit the pieces together to find your next card!' },
+    { make: makePipesPuzzle, hint: '\u{1F6B0} Connect the pipes to find your next card!' },
   ];
 
   function mediumHintText(target) {
