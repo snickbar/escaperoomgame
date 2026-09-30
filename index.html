@@ -414,11 +414,11 @@
     border: 2px solid #4caf7d;
     transform: rotateY(180deg);
     flex-direction: column;
-    gap: 6px;
+    gap: clamp(2px, 1vw, 6px);
   }
 
   .card-front .front-number {
-    font-size: 11px;
+    font-size: clamp(8px, 2.4vw, 11px);
     font-weight: 700;
     letter-spacing: 0.05em;
     color: #9fd6b8;
@@ -471,14 +471,19 @@
   }
 
   .card-front .message {
-    font-size: 14px;
+    /* Cards scale with the fixed 4-column grid now, and hints can name
+       3-digit numbers (and occasionally 3-4 of them at once), so this
+       needs to shrink on a narrow phone instead of clipping. */
+    font-size: clamp(9px, 3.4vw, 14px);
     font-weight: 600;
     color: #d8f5e6;
+    line-height: 1.25;
   }
 
   .card-front .hint {
-    font-size: 10px;
+    font-size: clamp(7px, 2.4vw, 10px);
     color: #9fd6b8;
+    line-height: 1.25;
   }
 
   .card-front.story {
@@ -2978,19 +2983,21 @@
     // Safety net: the escalating force-placement above should already make
     // this astronomically rare, but if a combo's second ingredient still
     // never got dropped, force it in now rather than leave a dangling,
-    // unpairable item on the table. Spread across distinct existing hosts
-    // (never stacking two onto the same card) so this fallback can't
-    // reintroduce the exact simultaneous-reveal problem it exists to avoid.
+    // unpairable item on the table. Each dangling combo gets its own fresh
+    // carrier node, chained one after another (root -> carrier1 -> combo1
+    // -> carrier2 -> combo2 -> ...) instead of piling them all directly
+    // onto root — root (or any other single card) must never end up
+    // naming 3+ numbers at once just because multiple combos happened to
+    // fall back here in the same game.
+    let danglingHost = root;
     Object.keys(pendingIngredient).forEach((key) => {
-      // A brand new carrier node per dangling combo, each its own direct
-      // child of root — guaranteed never to collide with another dangling
-      // combo's carrier, unlike reusing an existing node.
-      const carrier = makeNode('story', root.depth + 1);
-      root.unlocks.push(carrier.id);
+      const carrier = makeNode('story', danglingHost.depth + 1);
+      danglingHost.unlocks.push(carrier.id);
       const obj = makeNode('object', carrier.depth + 1);
       carrier.unlocks.push(obj.id);
       const combo = makeNode('combo', carrier.depth + 1);
       combo.requires = [pendingIngredient[key], obj.id];
+      danglingHost = combo;
     });
 
     const win = makeNode('win', 0);
@@ -3047,7 +3054,11 @@
   function describeUnlocks(nums) {
     if (!nums || nums.length === 0) return '';
     if (nums.length === 1) return 'Flip over card ' + nums[0] + '!';
-    return 'Flip over cards ' + nums.join(' and ') + '!';
+    if (nums.length === 2) return 'Flip over cards ' + nums.join(' and ') + '!';
+    // 3+ (an area hub whose shape didn't fit, falling back to named
+    // numbers) gets a real list — "A, B, and C" — instead of a run-on
+    // "A and B and C".
+    return 'Flip over cards ' + nums.slice(0, -1).join(', ') + ', and ' + nums[nums.length - 1] + '!';
   }
 
   // An area hub's hint names a shape instead of exact numbers — whatever
