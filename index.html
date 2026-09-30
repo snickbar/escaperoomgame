@@ -4310,7 +4310,16 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
+      navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {});
+    });
+    // Without this, a newly-activated service worker (see sw.js's
+    // skipWaiting/clients.claim) takes over silently, but the page you
+    // already have open keeps running the OLD html/js/css it loaded with —
+    // nothing makes it actually pick up the update until you happen to
+    // reload some other way. This reloads automatically the moment a new
+    // version takes control.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      window.location.reload();
     });
   }
 </script>
