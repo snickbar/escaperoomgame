@@ -265,12 +265,21 @@
   .card {
     position: relative;
     width: 100%;
-    aspect-ratio: 110 / 154;
+    /* A bit taller than a real playing card (110/154) to give story-mode
+       message+hint text more room, and its own containment context so
+       descendant text can scale off its OWN rendered width via cqw
+       (accurate regardless of viewport size or column count) rather than
+       an approximation based on the viewport. */
+    aspect-ratio: 110 / 170;
+    container-type: inline-size;
     perspective: 1000px;
     cursor: pointer;
     opacity: 1;
     transform: none;
     animation: dealIn 0.4s ease forwards;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   @keyframes dealIn {
@@ -304,6 +313,7 @@
     align-items: center;
     justify-content: center;
     font-size: clamp(28px, 12vw, 56px);
+    font-size: clamp(28px, 50cqw, 56px);
     font-weight: 800;
     color: #ff5c5c;
     text-shadow: 0 0 14px rgba(255, 92, 92, 0.85);
@@ -343,6 +353,7 @@
     align-items: center;
     justify-content: center;
     font-size: clamp(28px, 12vw, 56px);
+    font-size: clamp(28px, 50cqw, 56px);
     font-weight: 800;
     color: #7ee6a8;
     text-shadow: 0 0 14px rgba(126, 230, 168, 0.85);
@@ -386,7 +397,8 @@
     align-items: center;
     justify-content: center;
     text-align: center;
-    padding: 10px;
+    padding: 6px;
+    padding: 5cqw;
     box-sizing: border-box;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
     overflow: hidden;
@@ -400,11 +412,13 @@
   }
 
   .card-back .card-number {
-    /* Cards now scale with a fixed 4-column grid instead of a fixed pixel
+    /* Cards scale with a fixed 4-column grid instead of a fixed pixel
        size, so this needs to shrink with them on a narrow phone instead of
-       clipping — clamp() keeps it at the original 40px everywhere the card
-       is big enough for that (tablet/desktop). */
+       clipping. cqw scales off the card's own real rendered width (most
+       accurate); the vw line right before it is a fallback for browsers
+       that don't support container queries. */
     font-size: clamp(20px, 9vw, 40px);
+    font-size: clamp(20px, 36cqw, 40px);
     font-weight: 700;
     color: #6c7a96;
   }
@@ -415,10 +429,12 @@
     transform: rotateY(180deg);
     flex-direction: column;
     gap: clamp(2px, 1vw, 6px);
+    gap: clamp(2px, 5cqw, 6px);
   }
 
   .card-front .front-number {
     font-size: clamp(8px, 2.4vw, 11px);
+    font-size: clamp(7px, 9cqw, 11px);
     font-weight: 700;
     letter-spacing: 0.05em;
     color: #9fd6b8;
@@ -472,18 +488,22 @@
 
   .card-front .message {
     /* Cards scale with the fixed 4-column grid now, and hints can name
-       3-digit numbers (and occasionally 3-4 of them at once), so this
-       needs to shrink on a narrow phone instead of clipping. */
+       3-digit numbers, so this needs to shrink on a narrow phone instead
+       of clipping. cqw scales off the card's own real rendered width
+       (accurate regardless of viewport/column count); the vw line right
+       before it is a fallback for browsers without container queries. */
     font-size: clamp(9px, 3.4vw, 14px);
+    font-size: clamp(7px, 12.5cqw, 13px);
     font-weight: 600;
     color: #d8f5e6;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   .card-front .hint {
     font-size: clamp(7px, 2.4vw, 10px);
+    font-size: clamp(6px, 9cqw, 10px);
     color: #9fd6b8;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 
   .card-front.story {
