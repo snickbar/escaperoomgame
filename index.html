@@ -2893,7 +2893,7 @@
     // Precompute a well-spread sequence of ingredient-drop events, two per
     // combo (one per side), so the same combo's two ingredients always land
     // many nodes apart instead of together.
-    const comboCount = Math.min(COMBO_SETS.length, Math.max(1, Math.floor(budget / 10)));
+    const comboCount = Math.min(COMBO_SETS.length, Math.max(1, Math.floor(budget / 7)));
     let ingredientTokens = [];
     for (let i = 0; i < comboCount; i++) ingredientTokens.push(i, i);
     ingredientTokens = shuffle(ingredientTokens);
@@ -2911,11 +2911,16 @@
     }
     let tokenIdx = 0;
     const pendingIngredient = {};
+    const completedCombos = new Set();
 
     while (queue.length && budget > 0) {
       const node = queue.shift();
-      // A puzzle only ever reveals a single answer, so it can't branch or
-      // drop a combo ingredient — it always gets exactly one child.
+      // A puzzle only ever reveals a single answer, so it can't branch —
+      // it always gets exactly one child. That one child CAN still be a
+      // combo ingredient though (solving the puzzle reveals an item card,
+      // same as any other card) — excluding puzzles from ever dropping one
+      // used to starve combos of eligible opportunities whenever a run of
+      // consecutive puzzle nodes ate up most of the budget.
       const isPuzzle = node.kind === 'puzzle';
       const canBranch = node.depth >= MIN_BRANCH_DEPTH;
 
@@ -2935,7 +2940,7 @@
         const isFinish = nextComboIndex !== null && pendingIngredient[nextComboIndex] !== undefined;
         const mustForce = tokensLeft > 0 && tokensLeft >= budget - 1;
         const dropChance = isFinish ? 0.85 : 0.3;
-        const wantsIngredient = !isPuzzle && canBranch && !droppedIngredient &&
+        const wantsIngredient = canBranch && !droppedIngredient &&
           nextComboIndex !== null && (mustForce || Math.random() < dropChance);
 
         if (wantsIngredient) {
@@ -2949,13 +2954,17 @@
           } else {
             const otherId = pendingIngredient[comboIndex];
             delete pendingIngredient[comboIndex];
+            completedCombos.add(comboIndex);
             const combo = makeNode('combo', node.depth + 1);
             combo.requires = [otherId, obj.id];
             queue.push(combo);
             budget -= 1;
           }
         } else {
-          const kind = Math.random() < 0.55 ? 'story' : 'puzzle';
+          // Weighted toward puzzles — plain "flip over card X" filler
+          // beats are the least interesting card in the game, so they
+          // should be the minority, not the majority.
+          const kind = Math.random() < 0.3 ? 'story' : 'puzzle';
           const child = makeNode(kind, node.depth + 1);
           node.unlocks.push(child.id);
           queue.push(child);
@@ -2964,25 +2973,46 @@
       }
     }
 
-    // Safety net: the escalating force-placement above should already make
-    // this astronomically rare, but if a combo's second ingredient still
-    // never got dropped, force it in now rather than leave a dangling,
-    // unpairable item on the table. Each dangling combo gets its own fresh
-    // carrier node, chained one after another (root -> carrier1 -> combo1
-    // -> carrier2 -> combo2 -> ...) instead of piling them all directly
-    // onto root — root (or any other single card) must never end up
-    // naming 3+ numbers at once just because multiple combos happened to
-    // fall back here in the same game.
+    // Safety net: two ways a combo can still be unresolved here — either it
+    // got one ingredient dropped but never the second, or the tree ran out
+    // of eligible nodes before its token was ever reached in the sequence
+    // at all (more likely now that a chunk of budget goes to dead-end
+    // ingredient/object leaves instead of nodes that keep the queue going).
+    // Either way, force it in now rather than silently lose that combo or
+    // leave a dangling, unpairable item on the table. Each one gets its own
+    // fresh carrier node(s), chained one after another (root -> carrier1 ->
+    // combo1 -> carrier2 -> combo2 -> ...) instead of piling onto one card —
+    // no single card should ever end up naming 3+ numbers just because
+    // several combos happened to need this fallback in the same game.
     let danglingHost = root;
-    Object.keys(pendingIngredient).forEach((key) => {
-      const carrier = makeNode('story', danglingHost.depth + 1);
+    function attachCarrier(kind) {
+      const carrier = makeNode(kind, danglingHost.depth + 1);
       danglingHost.unlocks.push(carrier.id);
+      danglingHost = carrier;
+      return carrier;
+    }
+    for (let comboIndex = 0; comboIndex < comboCount; comboIndex++) {
+      if (completedCombos.has(comboIndex)) continue;
+      let firstId = pendingIngredient[comboIndex];
+      if (firstId === undefined) {
+        // This carrier needs to hold both the ingredient AND the next
+        // thing chained after it, so it has to be 'story' — a 'puzzle'
+        // node can only ever have the one answer.
+        const firstCarrier = attachCarrier('story');
+        const firstObj = makeNode('object', firstCarrier.depth + 1);
+        firstCarrier.unlocks.push(firstObj.id);
+        firstId = firstObj.id;
+      }
+      // This one only ever needs to hold the single ingredient, so it can
+      // follow the normal puzzle-weighted mix like everything else instead
+      // of always being 'story'.
+      const carrier = attachCarrier(Math.random() < 0.3 ? 'story' : 'puzzle');
       const obj = makeNode('object', carrier.depth + 1);
       carrier.unlocks.push(obj.id);
       const combo = makeNode('combo', carrier.depth + 1);
-      combo.requires = [pendingIngredient[key], obj.id];
+      combo.requires = [firstId, obj.id];
       danglingHost = combo;
-    });
+    }
 
     const win = makeNode('win', 0);
     win.isWin = true;
@@ -2991,7 +3021,7 @@
       if (n.unlocks.length === 0) n.unlocks.push(win.id);
     });
 
-    // Safety net: with 55% story / 45% puzzle odds this is astronomically
+    // Safety net: with 30% story / 70% puzzle odds this is astronomically
     // likely already, but guarantee at least one puzzle exists regardless.
     // Only a node with a single unlock is eligible — a puzzle only ever
     // reveals one answer, so converting a busier node would strand its
