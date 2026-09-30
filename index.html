@@ -2846,30 +2846,17 @@
   //            story node
   //   win    — the escape card; every dead-end node unlocks it
   //
-  // A "story"/"puzzle" node can also become an area hub (node.areaType set):
-  // instead of naming exact numbers, its hint points at a shape on the
-  // table relative to itself (its neighbors, diagonal neighbors, row, or
-  // column) — layoutStoryTable() later places its children at real cards
-  // occupying that exact shape, so the instruction is always literally true.
-  //
   // Nodes below MIN_BRANCH_DEPTH always get exactly one child (a forced
   // linear "spine" out of the root) so a game can never fan out — and
   // therefore can never dead-end — in the first couple of hops.
   const MIN_BRANCH_DEPTH = 2;
-
-  const AREA_TYPES = [
-    { type: 'neighbors', childCount: 4 },
-    { type: 'diagonal', childCount: 4 },
-    { type: 'horizontal', childCount: 2 },
-    { type: 'vertical', childCount: 2 },
-  ];
 
   function buildStoryGraph(usedCount) {
     const nodes = [];
     function makeNode(kind, depth) {
       const node = {
         id: nodes.length, kind, depth, unlocks: [], requires: null,
-        isStart: false, isWin: false, areaType: null, isAreaChild: false,
+        isStart: false, isWin: false,
       };
       nodes.push(node);
       return node;
@@ -2907,33 +2894,10 @@
 
     while (queue.length && budget > 0) {
       const node = queue.shift();
-      // A puzzle only ever reveals a single answer, so it can't branch,
-      // become an area hub, or drop a combo ingredient — it always gets
-      // exactly one child.
+      // A puzzle only ever reveals a single answer, so it can't branch or
+      // drop a combo ingredient — it always gets exactly one child.
       const isPuzzle = node.kind === 'puzzle';
       const canBranch = node.depth >= MIN_BRANCH_DEPTH;
-
-      const fittingAreaTypes = AREA_TYPES.filter((a) => a.childCount <= budget);
-      // A node that's already someone else's area-shape target can never
-      // become an area hub itself — it already has a table position fixed
-      // by its parent's shape, and giving it a second, independent shape of
-      // its own would need it to occupy two grid cells at once.
-      const wantsArea = !isPuzzle && canBranch && !node.isAreaChild &&
-        fittingAreaTypes.length > 0 && Math.random() < 0.12;
-
-      if (wantsArea) {
-        const choice = pickRandom(fittingAreaTypes);
-        node.areaType = choice.type;
-        for (let i = 0; i < choice.childCount && budget > 0; i++) {
-          const kind = Math.random() < 0.55 ? 'story' : 'puzzle';
-          const child = makeNode(kind, node.depth + 1);
-          child.isAreaChild = true;
-          node.unlocks.push(child.id);
-          queue.push(child);
-          budget -= 1;
-        }
-        continue;
-      }
 
       const wantsTwo = !isPuzzle && canBranch && budget >= 2 && Math.random() < 0.35;
       const childCount = isPuzzle ? 1 : (wantsTwo ? 2 : 1);
@@ -3009,12 +2973,11 @@
 
     // Safety net: with 55% story / 45% puzzle odds this is astronomically
     // likely already, but guarantee at least one puzzle exists regardless.
-    // Only a node with a single unlock and no area shape is eligible — a
-    // puzzle only ever reveals one answer, so converting a busier node
-    // would strand its other children.
+    // Only a node with a single unlock is eligible — a puzzle only ever
+    // reveals one answer, so converting a busier node would strand its
+    // other children.
     if (!nodes.some((n) => n.kind === 'puzzle')) {
-      const candidate = nodes.find((n) => n.kind === 'story' && !n.isStart &&
-        !n.areaType && n.unlocks.length <= 1);
+      const candidate = nodes.find((n) => n.kind === 'story' && !n.isStart && n.unlocks.length <= 1);
       if (candidate) candidate.kind = 'puzzle';
     }
 
@@ -3061,85 +3024,52 @@
     return 'Flip over cards ' + nums.slice(0, -1).join(', ') + ', and ' + nums[nums.length - 1] + '!';
   }
 
-  // An area hub's hint names a shape instead of exact numbers — whatever
-  // real cards layoutStoryTable() actually placed in that shape are what
-  // get unlocked, so the instruction is always literally true.
-  const AREA_HINTS = {
-    neighbors: [
-      'Flip over every card touching this one!',
-      'Flip over all of this card’s neighbors!',
-    ],
-    diagonal: [
-      'Flip over this card’s diagonal neighbors!',
-      'Flip over the cards diagonal from this one!',
-    ],
-    horizontal: ['Flip over the cards to the left and right of this one!'],
-    vertical: ['Flip over the cards directly above and below this one!'],
+  // A single directional nudge — "the card to your right/left/above/below"
+  // — used only when the board's true ascending order already happens to
+  // put a card's one real next step in exactly that spot relative to it.
+  // Never forced: most games have none or one, purely by chance.
+  const DIRECTION_HINTS = {
+    right: 'Flip over the card to your right!',
+    left: 'Flip over the card to your left!',
+    below: 'Flip over the card below this one!',
+    above: 'Flip over the card above this one!',
   };
+  const MAX_DIRECTIONAL_HINTS_PER_GAME = 2;
 
-  // Decides the actual grid position (row-major order) of every number on
-  // the table. Mostly that's just "sort ascending so a named number is easy
-  // to scan for," but area hubs need their own cell plus their children's
-  // cells to land in a specific real shape (its orthogonal/diagonal
-  // neighbors, or its row/column) — those get pinned to random valid grid
-  // coordinates first, everything else fills in around them.
-  function layoutStoryTable(nodes, numberForId, trapNumbers) {
+  // The table stays in plain true ascending order always — nothing here
+  // ever moves a card to make this happen. Instead, once every card has
+  // its final sorted position, this looks for any node with exactly one
+  // real next card (so "the card to your X" can only ever mean that one
+  // card, never leave out a sibling) whose single child's position already
+  // happens to be its immediate neighbor in some direction, and picks a
+  // small random handful of those genuine coincidences to phrase that way
+  // instead of naming the number.
+  function findDirectionalHints(nodes, numberForId, orderedNumbers) {
     const cols = STORY_TABLE_COLS;
-    const allNumbers = nodes.map((n) => numberForId[n.id]).concat(trapNumbers);
-    const totalSlots = allNumbers.length;
+    const rankOf = new Map();
+    orderedNumbers.forEach((num, idx) => rankOf.set(num, idx));
 
-    const slotNumber = new Array(totalSlots).fill(null);
-    const pinned = new Array(totalSlots).fill(false);
-
-    const OFFSETS = {
-      neighbors: [[-1, 0], [1, 0], [0, -1], [0, 1]],
-      diagonal: [[-1, -1], [-1, 1], [1, -1], [1, 1]],
-      horizontal: [[0, -1], [0, 1]],
-      vertical: [[-1, 0], [1, 0]],
-    };
-
-    function idxAt(r, c) {
-      if (r < 0 || c < 0 || c >= cols) return -1;
-      const idx = r * cols + c;
-      return idx < totalSlots ? idx : -1;
-    }
-
-    shuffle(nodes.filter((n) => n.areaType)).forEach((hub) => {
-      const offsets = OFFSETS[hub.areaType];
-      const needed = offsets.length;
-      if (hub.unlocks.length < needed) {
-        hub.areaType = null;
-        hub.areaPlaced = false;
-        return;
-      }
-      let placed = false;
-      for (let attempt = 0; attempt < 300 && !placed; attempt++) {
-        const centerIdx = Math.floor(Math.random() * totalSlots);
-        if (pinned[centerIdx]) continue;
-        const r = Math.floor(centerIdx / cols);
-        const c = centerIdx % cols;
-        const targetIdxs = offsets.map(([dr, dc]) => idxAt(r + dr, c + dc));
-        if (targetIdxs.some((idx) => idx === -1 || pinned[idx])) continue;
-        pinned[centerIdx] = true;
-        slotNumber[centerIdx] = numberForId[hub.id];
-        hub.unlocks.slice(0, needed).forEach((childId, i) => {
-          pinned[targetIdxs[i]] = true;
-          slotNumber[targetIdxs[i]] = numberForId[childId];
-        });
-        placed = true;
-      }
-      hub.areaPlaced = placed;
-      if (!placed) hub.areaType = null;
+    const opportunities = [];
+    nodes.forEach((n) => {
+      if (n.isStart || n.isWin || n.kind === 'object' || n.kind === 'puzzle') return;
+      if (n.unlocks.length !== 1) return;
+      const pr = rankOf.get(numberForId[n.id]);
+      const cr = rankOf.get(numberForId[n.unlocks[0]]);
+      if (pr === undefined || cr === undefined) return;
+      const prow = Math.floor(pr / cols), pcol = pr % cols;
+      const crow = Math.floor(cr / cols), ccol = cr % cols;
+      let direction = null;
+      if (crow === prow && ccol === pcol + 1) direction = 'right';
+      else if (crow === prow && ccol === pcol - 1) direction = 'left';
+      else if (ccol === pcol && crow === prow + 1) direction = 'below';
+      else if (ccol === pcol && crow === prow - 1) direction = 'above';
+      if (direction) opportunities.push({ id: n.id, direction });
     });
 
-    const pinnedNumbers = new Set(slotNumber.filter((v) => v !== null));
-    const remaining = allNumbers.filter((v) => !pinnedNumbers.has(v)).sort((a, b) => a - b);
-    let ri = 0;
-    for (let i = 0; i < totalSlots; i++) {
-      if (!pinned[i]) slotNumber[i] = remaining[ri++];
-    }
-
-    return slotNumber;
+    const picked = shuffle(opportunities).slice(0, randomInt(0, MAX_DIRECTIONAL_HINTS_PER_GAME));
+    const directionForId = {};
+    picked.forEach((o) => { directionForId[o.id] = o.direction; });
+    return directionForId;
   }
 
   // Assigns every graph node a real card number (0-199, spread across the
@@ -3192,10 +3122,11 @@
     const trapNumbers = [];
     for (let i = 0; i < trapCount && pool.length; i++) trapNumbers.push(pool.pop());
 
-    // Decides which node gets which grid cell — mutates area-hub nodes
-    // in-place (areaPlaced / areaType) so the hint text below can tell a
-    // successfully-placed area hub from one that couldn't find room.
-    const orderedNumbers = layoutStoryTable(nodes, numberForId, trapNumbers);
+    // True ascending order, always — a named number is easy to scan for,
+    // and it means findDirectionalHints below can trust grid position to
+    // be a deterministic function of the number alone.
+    const orderedNumbers = nodes.map((n) => numberForId[n.id]).concat(trapNumbers).sort((a, b) => a - b);
+    const directionForId = findDirectionalHints(nodes, numberForId, orderedNumbers);
 
     const itemForId = assignStoryItems(nodes);
 
@@ -3229,16 +3160,15 @@
         // The payoff card: confirms what got made and, like a story card,
         // still has to say what to flip next — losing this was the bug.
         message = pickRandom(COMBO_PRAISE) + ' ' + (backItem ? backItem.name : 'item') + '!';
-        hint = describeUnlocks(unlockNums);
+        hint = directionForId[n.id] ? DIRECTION_HINTS[directionForId[n.id]] : describeUnlocks(unlockNums);
         hasBeat = true;
       } else {
-        // A plain story beat — never just the bare "flip over card X".
-        // An area hub that actually got placed on the table gets a
-        // geometric hint instead of named numbers; one that didn't find
-        // room (areaType got cleared by layoutStoryTable) falls back to
-        // the normal named-numbers hint like any other story beat.
+        // A plain story beat — never just the bare "flip over card X",
+        // unless its one real next card just happens to already sit
+        // immediately next to it on the true-ascending-order board, in
+        // which case it occasionally gets to point that out directly.
         message = pickRandom(STORY_BEATS);
-        hint = (n.areaType && n.areaPlaced) ? pickRandom(AREA_HINTS[n.areaType]) : describeUnlocks(unlockNums);
+        hint = directionForId[n.id] ? DIRECTION_HINTS[directionForId[n.id]] : describeUnlocks(unlockNums);
         hasBeat = true;
       }
 
@@ -3299,11 +3229,8 @@
       const tableSize = randomInt(STORY_MODE_TABLE_SIZE_MIN, STORY_MODE_TABLE_SIZE_MAX);
       const usedRatio = STORY_MODE_USED_RATIO_MIN + Math.random() * (STORY_MODE_USED_RATIO_MAX - STORY_MODE_USED_RATIO_MIN);
       const usedCount = Math.round(tableSize * usedRatio);
-      // Already in final row-major table order — buildStoryCardContent's
-      // layout step sorts the untouched majority ascending for scanability,
-      // but deliberately places area-hub cards (and whichever cards their
-      // "flip your neighbors" shape points at) wherever that shape actually
-      // fits, so this order can't be re-sorted afterward.
+      // Already sorted ascending — a "flip over card 47" hint is easy to
+      // scan for instead of a hunt.
       numbers = buildStoryCardContent(tableSize, usedCount);
     } else {
       numbers = orderedNumbers(CARD_COUNT);
