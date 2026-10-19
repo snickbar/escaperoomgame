@@ -77,6 +77,64 @@ const server=http.createServer((req,res)=> {
     });
     console.log('Generation and real eligibility checks',logic);
     assert.deepEqual([...logic.types].sort(),['cryptogram','pipes','shapes','swap']);
+    const exhaustion=await page.evaluate(()=> {
+      const check=(condition,message)=>{if(!condition)throw Error(message);};
+      // Two instruction targets, a two-reward puzzle, a reused ingredient,
+      // and a crafted item that has another use later in the deck.
+      const fixture=new Map([
+        [0,{unlocks:[1,2]}], [1,{}], [2,{puzzle:{solved:false},unlocks:[3,4]}],
+        [3,{}], [4,{unlocks:[5]}], [5,{requires:[1,3],unlocks:[6]}],
+        [6,{requires:[1,5],unlocks:[7]}], [7,{isWin:true}], [99,{}],
+      ]);
+      const flipped=new Set([0,1]);
+      let used=()=>exhaustedCardNumbers(fixture,flipped,'story');
+      check(!used().has(0),'Instruction dimmed after only one target');
+      check(!used().has(1),'Waiting ingredient dimmed');
+      flipped.add(2);check(used().has(0),'Both instruction targets should exhaust the source');
+      check(!used().has(2),'Unsolved puzzle dimmed');
+      fixture.get(2).puzzle.solved=true;
+      check(!used().has(2),'Solved puzzle dimmed before its reward was flipped');
+      flipped.add(3);check(!used().has(2),'Puzzle dimmed with an outstanding second reward');
+      flipped.add(4);check(used().has(2),'Completed puzzle rewards should exhaust the puzzle');
+      flipped.add(5);check(used().has(3),'Spent ingredient should dim');
+      check(!used().has(1)&&!used().has(5),'Reused or crafted item dimmed before its later use');
+      flipped.add(6);check(used().has(1)&&used().has(5),'All ingredient uses completed but not dimmed');
+      check(!used().has(6),'Combo result still has an outstanding instruction');
+      flipped.add(7);check(used().has(6)&&!used().has(7),'Ending should stay bright');
+      check(!used().has(99),'Face-down trap should never dim');
+      const legacy=new Map([[0,{next:10,puzzle:{solved:false}}],[10,{next:20}],[20,{isWin:true}]]);
+      const seen=new Set([0,10]);
+      check(!exhaustedCardNumbers(legacy,seen,'easy').has(0),'An unsolved legacy puzzle dimmed');
+      legacy.get(0).puzzle.solved=true;
+      check(exhaustedCardNumbers(legacy,seen,'easy').has(0),'Legacy next-card completion not tracked');
+      check(!exhaustedCardNumbers(legacy,seen,'medium').has(10),'Medium card dimmed too early');
+      const hard=new Map([[5,{next:10}],[10,{next:15}],[15,{requires:[5,10],next:25}],[25,{requires:[5,15],isWin:true}]]);
+      const hardSeen=new Set([5,10,15]);
+      check(!exhaustedCardNumbers(hard,hardSeen,'hard').has(5),'Hard ingredient still needed later');
+      check(exhaustedCardNumbers(hard,hardSeen,'hard').has(10),'Spent hard ingredient not dimmed');
+      hardSeen.add(25);check(exhaustedCardNumbers(hard,hardSeen,'hard').has(5),'Reused hard ingredient not exhausted');
+
+      storyChoiceEl.value='lighthouse';startDeck('story');pendingSeed=1234;performDeal();
+      const root=[...cardContent].find(([,c])=>c.isSeed);
+      const el=n=>tableEl.querySelector('.card[data-number="'+n+'"]');
+      const isUsed=n=>el(n).classList.contains('exhausted');
+      const item=root[1].unlocks.find(n=>cardContent.get(n).kind==='object');
+      const clue=root[1].unlocks.find(n=>n!==item);
+      el(item).click();check(!isUsed(root[0]),'Actual root dimmed after only one flip');
+      el(clue).click();check(isUsed(root[0]),'Actual root did not dim');
+      check(!isUsed(item),'Actual pending item dimmed');
+      el(root[0]).click();check(zoomOverlay.classList.contains('open'),'Exhausted cards must remain readable');closeZoom();
+      const p=cardContent.get(clue);p.puzzle.solved=true;onPuzzleSolved(p,clue);
+      check(!isUsed(clue),'Actual puzzle dimmed before rewards');
+      el(p.unlocks[0]).click();check(!isUsed(clue),'Actual puzzle dimmed after only one reward');
+      el(p.unlocks[1]).click();check(isUsed(clue),'Actual puzzle did not dim after both rewards');
+      return {fixtures:true,actualClicks:true,zoom:true};
+    });console.log('Card exhaustion checks',exhaustion);
+    await page.locator('.card.exhausted').first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(700);
+    assert.equal(await page.locator('.card.exhausted .card-front').first().evaluate(el=>Number(getComputedStyle(el).opacity)),.48);
+    await page.screenshot({path:path.join(out,'exhausted-cards.png')});
+    assert.equal(await page.evaluate(()=>{performDeal();return !!tableEl.querySelector('.exhausted');}),false);
     const layout=[];
     for(const width of [320,390,768,1280]) {
       await page.setViewportSize({width,height:900});

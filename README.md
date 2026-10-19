@@ -3,7 +3,7 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.5.0
+## Current release: 0.5.1
 
 Story Mode has three complete adventures: **The Last Light**, **The Midnight
 Archive**, and **Pip Beyond the Garden**. Choose an adventure above the deck menu,
@@ -92,8 +92,14 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.5.0.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.5.1.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.5.0/EscapeRoom-0.5.0.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.5.1/EscapeRoom-0.5.1.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
+
+Revealed cards dim once all their uses are complete: every instructed/reward
+card has been opened, their puzzle is solved, and every recipe needing the
+item has been revealed. Waiting ingredients remain bright, including reused
+items and crafted items needed again later. Dimmed cards remain tappable for
+reference; the ending stays bright. The same tracking applies to all decks.

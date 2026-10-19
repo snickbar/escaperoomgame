@@ -1,8 +1,9 @@
 // Native release smoke test. Deliberately restricted to an Android emulator.
-// Requires a running, authorized emulator and a built dist/EscapeRoom-0.5.0.apk.
+// Requires a running, authorized emulator and a built APK for package.json's version.
 const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'..');
+const version=require(path.join(root,'package.json')).version;
 const sdk=process.env.ANDROID_HOME||path.join(process.env.LOCALAPPDATA,'Android','Sdk');
 const adb=path.join(sdk,'platform-tools','adb.exe');
 const serial=process.env.ANDROID_SERIAL||'emulator-5556';
@@ -32,15 +33,15 @@ function tapNode(node) {
   shell('input','tap',String(Math.round((bounds[0]+bounds[2])/2)),String(Math.round((bounds[1]+bounds[3])/2)));
 }
 function screenshot(name) {run('emu','screenrecord','screenshot',path.join(out,name));}
-function launch() {shell('am','start','-W','-n','com.snickbar.escaperoom/.MainActivity');waitForText('Version 0.5.0');}
+function launch() {shell('am','start','-W','-n','com.snickbar.escaperoom/.MainActivity');waitForText('Version '+version);}
 
 try {
-  run('install','-r',path.join(root,'dist','EscapeRoom-0.5.0.apk'));
+  run('install','-r',path.join(root,'dist',`EscapeRoom-${version}.apk`));
   shell('svc','wifi','disable');shell('svc','data','disable');
   shell('am','force-stop','com.snickbar.escaperoom');launch();
   let ui=nodes();
   assert.ok(ui.some(n=>n.text==='Android app · Ready to play offline'));
-  assert.ok(ui.some(n=>n.text==='Version 0.5.0'));
+  assert.ok(ui.some(n=>n.text==='Version '+version));
   console.log('Offline APK home loaded.');
   const originalSound=ui.find(n=>/^Sound (on|off)$/.test(n.text)).text;
   tapText(originalSound,ui);

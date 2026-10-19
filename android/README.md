@@ -16,7 +16,7 @@ repository root in PowerShell:
 ```
 
 The Gradle wrapper downloads its pinned Gradle distribution and dependencies
-on the first build. Output: `dist/EscapeRoom-0.5.0.apk`. The build includes
+on the first build. Output: `dist/EscapeRoom-0.5.1.apk`. The build includes
 Android lint and signature verification. Use `-Offline` for a cached build.
 
 The first build creates a signing key and random password under

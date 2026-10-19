@@ -38,7 +38,8 @@ if ($Offline) { $buildArgs += '--offline' }
 if ($LASTEXITCODE -ne 0) { throw 'Android build failed.' }
 $outputDir = Join-Path $projectRoot 'dist'
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
-$apk = Join-Path $outputDir 'EscapeRoom-0.5.0.apk'
+$gameVersion = (Get-Content (Join-Path $projectRoot 'package.json') -Raw | ConvertFrom-Json).version
+$apk = Join-Path $outputDir "EscapeRoom-$gameVersion.apk"
 Copy-Item -LiteralPath (Join-Path $androidRoot 'app\build\outputs\apk\release\app-release.apk') -Destination $apk
 $toolsVersion = Get-ChildItem (Join-Path $sdkRoot 'build-tools') -Directory | Sort-Object Name -Descending | Select-Object -First 1
 & (Join-Path $toolsVersion.FullName 'apksigner.bat') verify --verbose $apk

@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.5.0';
+const GAME_VERSION = '0.5.1';
 const GAME_SCHEMA = 'ER2';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
@@ -75,6 +75,41 @@ function assignAdventureItems(nodes) {
 
 function puzzleResultText(p) {
   return describeUnlocks(p.answers || [p.answer]);
+}
+
+// A card stays useful until every outgoing clue AND every recipe using it
+// has paid off. Inspect the whole deck so an ingredient can wait for a later pair.
+function exhaustedCardNumbers(cards, flipped, mode) {
+  const uses = new Map();
+  cards.forEach((content, result) => {
+    (content.requires || []).forEach(ingredient => {
+      if (!uses.has(ingredient)) uses.set(ingredient, []);
+      uses.get(ingredient).push(result);
+    });
+  });
+  const exhausted = new Set();
+  flipped.forEach(number => {
+    const content = cards.get(number);
+    if (!content || content.isWin || content.puzzle && !content.puzzle.solved) return;
+    const rewards = mode === 'story' ? (content.unlocks || [])
+      : (content.next == null ? [] : [content.next]);
+    const targets = [...rewards, ...(uses.get(number) || [])];
+    if (targets.every(target => flipped.has(target))) exhausted.add(number);
+  });
+  return exhausted;
+}
+
+function refreshCardExhaustion() {
+  const cards = [...tableEl.querySelectorAll('.card')];
+  const flipped = new Set(cards.filter(card => card.classList.contains('flipped'))
+    .map(card => Number(card.dataset.number)));
+  const exhausted = exhaustedCardNumbers(cardContent, flipped, currentMode);
+  cards.forEach(card => {
+    const used = exhausted.has(Number(card.dataset.number));
+    card.classList.toggle('exhausted', used);
+    if (used) card.title = 'All uses completed — tap to view';
+    else card.removeAttribute('title');
+  });
 }
 
 // The runtime and the regression tests share this exact eligibility rule.

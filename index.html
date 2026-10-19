@@ -387,6 +387,9 @@
     transform: rotateY(180deg);
   }
 
+  .card-front { transition: opacity .25s ease, filter .25s ease; }
+  .card.flipped.exhausted .card-front { opacity: .48; filter: grayscale(.65); }
+
   .card-face {
     position: absolute;
     width: 100%;
@@ -2859,7 +2862,8 @@
         message = '✓ Item found!';
       }
 
-      cardContent.set(num, { isStory, isWin, isSeed, next, message, hint, backItem: itemForNumber[num], puzzle: null });
+      cardContent.set(num, { isStory, isWin, isSeed, next, message, hint, backItem: itemForNumber[num], puzzle: null,
+        requires: i >= 2 ? pairFor[num].slice() : null });
     });
 
     numbers.forEach((num) => {
@@ -3072,6 +3076,7 @@
 
   function onPuzzleSolved(content,num) {
     if (num !== null && currentMode === 'story' && cardContent.get(num) === content) refreshStoryUnlocks();
+    if (num !== null && cardContent.get(num) === content) refreshCardExhaustion();
   }  function tableSizeForMode(mode) {
     // Story Mode's table size isn't decided until it's dealt, so the
     // pre-deal preview shows the range rather than a committed number.
@@ -3092,6 +3097,7 @@
     pendingSeed = null;
     runEnded = false; mistakeLog = []; assistedRun = false;
     withGameSeed(runSeed, dealGeneratedCards);
+    refreshCardExhaustion();
     updateAdventureStatus();
     fitTableText();
   }
@@ -3123,7 +3129,7 @@
       card.dataset.number = num;
 
       const hasArt = !!content.backItem;
-      const isCombo = !!content.requires;
+      const isCombo = currentMode === 'story' && !!content.requires;
       const iconInner = hasArt ? `<div class="front-icon">${itemVisual(content.backItem)}</div>` : '';
       // The story intro, the win card, a combo's "you made it!" line, and
       // every plain story beat all carry real flavor text — the generic
@@ -3173,6 +3179,7 @@
         } else {
           currentTarget = content.next;
         }
+        refreshCardExhaustion();
         if (content.isWin) {
           winPending=true;
           scheduleGame(triggerWin, 700);
