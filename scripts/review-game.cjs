@@ -287,13 +287,13 @@ const server=http.createServer((req,res)=> {
         const next=solveShapeRemainder(p)[0];if(!next)return null;
         const selector='.shapes-piece[data-piece-id="'+next.piece.id+'"]';
         document.querySelector(selector).scrollIntoView({block:'center'});
-        return {id:next.piece.id,origin:next.origin,cells:next.piece.currentCells};
+        return {id:next.piece.id,origin:next.origin,cells:next.piece.currentCells,cell:parseFloat(shapesGridEl.firstElementChild.style.width),border:shapesGridEl.clientLeft};
       });if(!target)break;
       const rect=await touch.locator('.shapes-piece[data-piece-id="'+target.id+'"]').boundingBox();
       const board=await touch.locator('#shapesGrid').boundingBox();
       const maxR=Math.max(...target.cells.map(c=>c[0])),maxC=Math.max(...target.cells.map(c=>c[1]));
       const from={x:rect.x+rect.width/2,y:rect.y+rect.height/2};
-      const to={x:board.x+4+target.origin[1]*40+(maxC*40+38)/2,y:board.y+4+target.origin[0]*40+(maxR*40+38)/2};
+      const to={x:board.x+target.border+4+target.origin[1]*(target.cell+2)+(maxC*(target.cell+2)+target.cell)/2,y:board.y+target.border+4+target.origin[0]*(target.cell+2)+(maxR*(target.cell+2)+target.cell)/2};
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[from]});
       for(let step=1;step<=8;step++)await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:from.x+(to.x-from.x)*step/8,y:from.y+(to.y-from.y)*step/8}]});
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});

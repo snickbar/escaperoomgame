@@ -2,6 +2,9 @@
 function puzzleTheme(content){return Number.isInteger(content.chapter)&&activeStory?activeStory.id:document.getElementById('storyChoice').value||'lighthouse';}
 function configurePuzzleArt(content){
   const p=content.puzzle,theme=puzzleTheme(content);
+  const boardWidth=puzzleBoardWidth();
+  zoomPuzzleEl.style.setProperty("--puzzle-board-width",Math.min(boardWidth,innerHeight*.64)+"px");
+  pipesGridEl.style.setProperty("--pipe-cell",Math.floor((Math.min(boardWidth,innerHeight*.64)-44)/4)+"px");
   requestAnimationFrame(()=>{zoomCardEl.scrollTop=0;});
   p.artwork ||= p.type==='shapes'?'art/scenes/'+theme+'-document.svg':p.type==='swap'&&content.chapter>=5?'art/story/'+theme+'-'+content.chapter+'-c.svg':'art/scenes/'+theme+'.png';
   if(p.type==='pipes')p.pipeStyle ||= theme==='library'?'electric':'water';
@@ -71,6 +74,20 @@ function pipeTubeArt(tile,flow,style){
     <path class="tube-shadow" d="${path}"/><path class="tube-metal" d="${path}"/><path class="tube-rust" d="${path}" stroke="url(#${rustId})" stroke-width="20"/><path class="tube-bore" d="${path}"/>
     <path class="tube-fill" d="${path}" pathLength="1"/><path class="tube-motion" d="${path}" pathLength="1"/>
     <path class="tube-shine" d="${path}"/>
-    ${dirs.map(d=>{const [x,y]=points[d];return `<circle class="tube-collar" cx="${x}" cy="${y}" r="8"/>`;}).join('')}
     </svg>`;
 }
+// Match the actual modal width so enlarged boards and drag coordinates agree.
+function puzzleBoardWidth(){
+ const style=getComputedStyle(zoomCardEl);
+ return Math.max(200,Math.min(760,zoomCardEl.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-6));
+}
+let puzzleResizeFrame;
+window.addEventListener('resize',()=>{
+ cancelAnimationFrame(puzzleResizeFrame);
+ puzzleResizeFrame=requestAnimationFrame(()=>{
+  const context=currentPuzzleContext;
+  if(!context?.content.puzzle||context.content.puzzle.solved||zoomPuzzleEl.hidden||!zoomOverlay.classList.contains('open'))return;
+  const p=context.content.puzzle;
+  renderPuzzle(context.content,context.num,{isTest:context.num===null,onRetry:()=>openTestPuzzle(p.type==='pipes'&&p.pipeStyle==='electric'?'electric':p.type)});
+ });
+});

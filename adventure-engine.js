@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.7.0';
+const GAME_VERSION = '0.7.1';
 const GAME_SCHEMA = 'ER2';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
@@ -169,6 +169,7 @@ function solveShapeRemainder(p, limit=50000) {
     for(const piece of remaining) {
       for(const [dr,dc] of piece.currentCells) {
         const r=row-dr,c=col-dc;
+        if(p.restoration&&(r!==piece.solvedOrigin[0]||c!==piece.solvedOrigin[1]))continue;
         if(!shapesCanPlace(piece,r,c,p.rows,p.cols,covered)) continue;
         const cells=piece.currentCells.map(([rr,cc])=>(r+rr)*p.cols+c+cc);
         cells.forEach(i=>covered[i]=piece.id);
@@ -197,4 +198,30 @@ function placeShapeHint(p) {
   piece.placed=true; piece.placedOrigin=origin.slice();
   p.hintsRemaining--;
   return {id:piece.id,moved};
+}
+// Compare silhouettes independently of translation, rotation, and reflection.
+function shapeSilhouette(cells){
+  const variants=[];
+  for(const flip of [1,-1])for(let turn=0;turn<4;turn++){
+    const points=cells.map(([r,c])=>{let x=r,y=c*flip;for(let n=0;n<turn;n++)[x,y]=[y,-x];return [x,y];});
+    const minR=Math.min(...points.map(p=>p[0])),minC=Math.min(...points.map(p=>p[1]));
+    variants.push(points.map(([r,c])=>[r-minR,c-minC]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(p=>p.join(',')).join(';'));
+  }
+  return variants.sort()[0];
+}
+function variedShapesTiling(rows,cols){
+  for(let attempt=0;attempt<100;attempt++){
+    const pieces=buildShapesTiling(rows,cols,0),counts=new Map();
+    pieces.forEach(cells=>{const key=shapeSilhouette(cells);counts.set(key,(counts.get(key)||0)+1);});
+    if(pieces.length>=4&&pieces.length<=10&&pieces.every(c=>c.length>=2&&c.length<=8)&&
+      Math.max(...counts.values())<=2&&new Set(pieces.map(c=>c.length)).size>=3)return pieces;
+  }
+  // Known complete, connected tilings provide a bounded fallback, without
+  // relaxing the duplicate limit or producing an unsolvable board.
+  const template=['AABB','ACBB','DCCE','DDCE','FFFE'].map(row=>row.split(''));
+  if(rows===6)template.push(['G','G','G','G']);
+  if(rows===7)template.push(['G','G','G','H'],['G','H','H','H']);
+  if(cols===5)template.forEach((row,r)=>row.push(r<5?'I':'G'));
+  const groups=new Map();template.forEach((row,r)=>row.forEach((id,c)=>{if(!groups.has(id))groups.set(id,[]);groups.get(id).push([r,c]);}));
+  return [...groups.values()];
 }

@@ -1,6 +1,6 @@
 {
   "name": "escape-room-card-game",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "scripts": {
     "test": "node scripts/review-game.cjs && node scripts/review-tabletop.cjs && node scripts/review-puzzle-art.cjs",

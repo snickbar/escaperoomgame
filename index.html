@@ -1943,7 +1943,7 @@
   // swap with any other here, and the grid is a size bigger to compensate
   // for how much easier that makes it: 4x4 numbered 1-16, no blank.)
 
-  const SWAP_SIZE = 4;
+  const SWAP_SIZE = 3;
 
   function makeSwapPuzzle(target) {
     const solved = Array.from({ length: SWAP_SIZE * SWAP_SIZE }, (_, i) => i + 1);
@@ -2155,7 +2155,8 @@
       const sc = start % cols;
       const cells = [[sr, sc]];
       owner[start] = pieces.length;
-      while (cells.length < targetSize) {
+      const desiredSize=targetSize || randomInt(2,7);
+      while (cells.length < desiredSize) {
         const candidates = [];
         cells.forEach(([r, c]) => {
           [[-1, 0], [1, 0], [0, -1], [0, 1]].forEach(([dr, dc]) => {
@@ -2173,7 +2174,7 @@
       }
       pieces.push(cells);
     }
-    return mergeSmallShapePieces(pieces, rows, cols, targetSize, SHAPES_MAX_PIECE_SIZE);
+    return mergeSmallShapePieces(pieces, rows, cols, targetSize || 2, SHAPES_MAX_PIECE_SIZE);
   }
 
   function shapeCellsConnected(cells) {
@@ -2279,7 +2280,6 @@
   }
 
   function shapesCanPlace(piece, originR, originC, rows, cols, covered) {
-    if(piece.restorationOrigin && (originR!==piece.restorationOrigin[0] || originC!==piece.restorationOrigin[1]))return false;
     return piece.currentCells.every(([dr, dc]) => {
       const r = originR + dr;
       const c = originC + dc;
@@ -2320,7 +2320,7 @@
 
   function makeShapesPuzzle(target) {
     const { rows, cols } = pickRandom(SHAPES_SIZE_OPTIONS);
-    const rawPieces = buildShapesTiling(rows, cols, SHAPES_TARGET_PIECE_SIZE);
+    const rawPieces = variedShapesTiling(rows, cols);
     const pieces = rawPieces.map((cells, i) => {
       const minR = Math.min(...cells.map(([r]) => r));
       const minC = Math.min(...cells.map(([, c]) => c));
@@ -2334,7 +2334,6 @@
         color: SHAPES_PALETTE[i % SHAPES_PALETTE.length],
         solvedCells,
         solvedOrigin,
-        restorationOrigin: solvedOrigin,
         currentCells,
         placed: false,
         placedOrigin: null,
@@ -3449,16 +3448,18 @@
     }
 
     function applyGuess(index, letter) {
+      if(p.guesses[index]===p.plaintext[index])return;
       const ch = p.ciphertext[index];
       for (let i = 0; i < p.ciphertext.length; i++) {
-        if (p.ciphertext[i] === ch) p.guesses[i] = letter;
+        if (p.ciphertext[i] === ch && p.guesses[i]!==p.plaintext[i]) p.guesses[i] = letter;
       }
     }
 
     function clearGuess(index) {
+      if(p.guesses[index]===p.plaintext[index])return;
       const ch = p.ciphertext[index];
       for (let i = 0; i < p.ciphertext.length; i++) {
-        if (p.ciphertext[i] === ch) p.guesses[i] = null;
+        if (p.ciphertext[i] === ch && p.guesses[i]!==p.plaintext[i]) p.guesses[i] = null;
       }
     }
 
@@ -3494,6 +3495,7 @@
           <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}${isHinted ? ' hinted' : ''}"><span class="${guess&&drawnGuesses[i]!==guess?'pencil-mark':''}">${guess || '_'}</span></div>
         `;
         unit.querySelector('.cipher-blank').addEventListener('click', () => {
+          if(isCorrect||p.solved)return;
           activeIndex = i;
           hintedIndices = new Set();
           renderGrid();
@@ -3532,12 +3534,12 @@
       back.textContent = '⌫';
       back.addEventListener('click', () => {
         if (p.solved) return;
-        if (activeIndex !== -1 && p.guesses[activeIndex]) {
+        if (activeIndex !== -1 && p.guesses[activeIndex] && p.guesses[activeIndex]!==p.plaintext[activeIndex]) {
           clearGuess(activeIndex);
         } else {
           const from = activeIndex === -1 ? p.ciphertext.length : activeIndex;
           for (let i = from - 1; i >= 0; i--) {
-            if (p.ciphertext[i] !== ' ') {
+            if (p.ciphertext[i] !== ' ' && p.guesses[i] && p.guesses[i]!==p.plaintext[i]) {
               activeIndex = i;
               clearGuess(i);
               break;
@@ -3856,8 +3858,8 @@
 
     function renderTiles() {
       pipesGridEl.innerHTML = '';
-      pipesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', 46px)';
-      pipesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', 46px)';
+      pipesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', var(--pipe-cell))';
+      pipesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', var(--pipe-cell))';
       const flow = pipeFlowState(p,flowHistory);
       const connected = new Set(flow.keys());
       p.tiles.forEach((t) => {
@@ -3912,6 +3914,8 @@
     opts = opts || {};
     const isTest = !!opts.isTest;
     const p = content.puzzle;
+    const SHAPES_CELL_PX=Math.max(28,Math.min(82,Math.floor((puzzleBoardWidth()-18)/p.cols)-2,Math.floor(innerHeight*.57/p.rows)-2));
+    const SHAPES_GRID_PITCH_PX=SHAPES_CELL_PX+2;
 
     cipherGridEl.hidden = true;
     cipherKeyboardEl.hidden = true;
@@ -3920,7 +3924,7 @@
     pipesGridEl.hidden = true;
     shapesAreaEl.hidden = false;
 
-    puzzleInstructionsEl.textContent = 'Put the torn document back together. Drag fragments onto the faded outline; the writing and drawing must line up. Pieces snap to their original places. No rotation needed.';
+    puzzleInstructionsEl.textContent = 'Put the torn document back together. Drag pieces anywhere they fit, then move them around until the writing and drawing line up. No rotation needed.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3973,6 +3977,8 @@
       if (shapesIsSolved(p)) {
         solvePuzzle();
         render();
+      } else if(p.pieces.every(pc=>pc.placed)) {
+        puzzleFeedbackEl.textContent='All pieces fit. Now rearrange them so the picture lines up.';
       }
     }
 
@@ -4107,6 +4113,8 @@
       if (shapesIsSolved(p)) {
         solvePuzzle();
         render();
+      } else if(p.pieces.every(pc=>pc.placed)) {
+        puzzleFeedbackEl.textContent="All pieces fit. Now rearrange them so the picture lines up.";
       }
     }
 
@@ -4134,6 +4142,7 @@
           const cell = document.createElement('div');
           cell.className = 'shapes-cell' + (pieceId !== null ? ' filled' : '') +
             (pieceId !== null && pieceId === hintedPieceId ? ' hinted' : '');
+          cell.style.width=SHAPES_CELL_PX+'px';cell.style.height=SHAPES_CELL_PX+'px';
           if (pieceId !== null) {
             const piece = p.pieces.find((pc) => pc.id === pieceId);
             paintRestorationCell(cell,p,piece,r-piece.placedOrigin[0],c-piece.placedOrigin[1],SHAPES_CELL_PX);
