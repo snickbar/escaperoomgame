@@ -3,7 +3,7 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.9.2 — a calmer table and fresh puzzle art
+## Current release: 0.9.3 — a calmer table and fresh puzzle art
 
 - **Testing build:** puzzle hints are unlimited (`PUZZLE_HINT_COUNT = Infinity`
   in `index.html`). Set it back to 2 before a public release.
@@ -166,9 +166,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.9.2.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.9.3.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.9.2/EscapeRoom-0.9.2.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.9.3/EscapeRoom-0.9.3.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

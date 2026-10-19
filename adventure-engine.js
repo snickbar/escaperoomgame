@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.9.2';
+const GAME_VERSION = '0.9.3';
 const GAME_SCHEMA = 'ER3';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;

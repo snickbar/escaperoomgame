@@ -1,9 +1,9 @@
 {
   "name": "escape-room-card-game",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "scripts": {
-    "test": "node scripts/review-game.cjs && node scripts/review-tabletop.cjs && node scripts/review-puzzle-art.cjs && node scripts/review-discoveries.cjs",
+    "test": "node scripts/check-android-assets.cjs && node scripts/review-game.cjs && node scripts/review-tabletop.cjs && node scripts/review-puzzle-art.cjs && node scripts/review-discoveries.cjs",
     "art": "node scripts/make-story-art.cjs"
   },
   "devDependencies": {

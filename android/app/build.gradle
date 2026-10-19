@@ -11,8 +11,8 @@ android {
         applicationId 'com.snickbar.escaperoom'
         minSdk 26
         targetSdk 35
-        versionCode 90200
-        versionName '0.9.2'
+        versionCode 90300
+        versionName '0.9.3'
     }
     buildFeatures { buildConfig true }
     signingConfigs {
@@ -45,7 +45,7 @@ def bundleGame = tasks.register('bundleGame', Sync) {
         include 'index.html', 'gallery.html', 'app-ui.js', 'adventure-engine.js',
                 'story-content.js', 'story-assets.json', 'manifest.json', 'tabletop.js', 'tabletop.css', 'puzzle-art.js', 'puzzle-art.css', 'discovery-puzzles.js',
                 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
-                'art/items/**', 'art/story/**', 'art/scenes/**'
+                'art/items/**', 'art/story/**', 'art/scenes/**', 'art/puzzles/**'
     }
     into layout.buildDirectory.dir('generated/gameAssets/game')
 }
