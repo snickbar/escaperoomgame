@@ -36,12 +36,33 @@ const combineDialog = document.getElementById('combineDialog');
 const codeFeedback = document.getElementById('codeFeedback');
 const tabletopZoomCode=document.createElement('button');
 tabletopZoomCode.className='primary-action';tabletopZoomCode.type='button';tabletopZoomCode.textContent='Enter clue code ↗';tabletopZoomCode.hidden=true;
-tabletopZoomCode.onclick=openCodeEntry;zoomCardEl.appendChild(tabletopZoomCode);
+tabletopZoomCode.onclick=()=>{
+  if(currentPuzzleContext&&!currentPuzzleContext.content.puzzle)closeZoom();
+  else openCodeEntry();
+};zoomCardEl.appendChild(tabletopZoomCode);
+function tabletopRewardNumbers(context) {
+  if(!tabletopActive()||!tabletopState||runEnded||winPending||!context||context.num===null||
+    cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||context.content.puzzle)return [];
+  return (context.content.unlocks||[]).filter(n=>!flippedNumbers.has(n)&&unlockedNumbers.has(n));
+}
+function collectTabletopRewards(context) {
+  const rewards=tabletopRewardNumbers(context);
+  rewards.forEach(n=>drawTabletopCard(n,'reward',context));
+  if(rewards.length)showToast('New cards added to your table.');
+}
 function configureTabletopZoom() {
   const context=currentPuzzleContext;
   tabletopZoomCode.hidden=!tabletopActive()||!tabletopState||!context||context.num===null||
     !!(context.content.puzzle&&!context.content.puzzle.solved)||
     !(context.content.unlocks||[]).some(n=>!flippedNumbers.has(n));
+  const rewards=tabletopRewardNumbers(context);
+  tabletopZoomCode.textContent=rewards.length
+    ? 'Take '+(rewards.length===1?'card ':'cards ')+rewards.join(' and ')
+    : 'Enter clue code ↗';
+  if(tabletopActive()&&tabletopState&&context&&!context.content.puzzle){
+    tabletopZoomCode.hidden=!rewards.length;
+    if(rewards.length)zoomHintEl.textContent='Take these cards to follow your next lead.';
+  }
 }
 for (const dialog of [codeDialog, discardDialog, combineDialog]) {
   dialog.querySelector('.dialog-close').onclick = () => dialog.close();
@@ -181,7 +202,7 @@ function makeTabletopCard(number) {
     <div class="tabletop-card-top"><span class="card-kind">${type}</span><span class="front-number">${number}</span></div>
     ${item?'<div class="front-icon">'+itemVisual(item)+'</div>':'<div class="clue-illustration" aria-hidden="true">'+puzzleStamp(content.puzzle?.type)+'</div>'}
     <h3 class="message">${title}</h3>
-    <p class="hint">${content.puzzle&&!content.puzzle.solved?'Tap to solve & discover what comes next.':item&&!content.unlocks.length?'Drag onto another item':content.hint}</p>
+    <p class="hint">${content.puzzle&&!content.puzzle.solved?'Tap to solve & discover what comes next.':combinable?'Drag onto another item':'Tap to read your discovery.'}</p>
     ${combinable?'<button class="combine-choice" type="button" aria-label="Choose an item to combine with '+item.name+'">Combine…</button>':''}
     </div></div>`;
   card.onclick=()=>{if(performance.now()<tabletopSuppressClickUntil||runEnded||winPending)return;openZoom(number);};
@@ -206,11 +227,12 @@ function validCodeTargets() {
   return new Set([...targets].filter(n=>unlockedNumbers.has(n)));
 }
 
-function drawTabletopCard(number,via) {
-  if(via!=='code'&&via!=='combine')return false;
+function drawTabletopCard(number,via,source) {
+  if(via!=='code'&&via!=='combine'&&via!=='reward')return false;
   if(!tabletopState||runEnded||winPending||flippedNumbers.has(number))return false;
   const c=cardContent.get(number);if(!c)return false;
   if(via==='code'&&!validCodeTargets().has(number))return false;
+  if(via==='reward'&&!tabletopRewardNumbers(source).includes(number))return false;
   if(via==='combine'&&(!c.requires||!c.requires.every(n=>tabletopState.active.has(n))))return false;
   flippedNumbers.add(number);tabletopState.lastDraw=[number];
   refreshStoryUnlocks();syncTabletop();playCorrectSound();
@@ -228,6 +250,7 @@ function recordTabletopError(card,reason) {
 function openCodeEntry() {
   if(!tabletopState||runEnded||winPending)return;
   closeZoom();
+  if(runEnded||winPending)return;
   document.getElementById('discoveryCode').value='';
   codeFeedback.textContent='An incorrect code costs one life.';codeFeedback.className='';
   codeDialog.showModal();document.getElementById('discoveryCode').focus();

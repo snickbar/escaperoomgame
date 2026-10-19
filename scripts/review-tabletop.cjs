@@ -32,6 +32,8 @@ const server=http.createServer((req,res)=>{
     await page.screenshot({path:path.join(out,'tabletop-start.png'),fullPage:true});
     const puzzle=await page.evaluate(()=>[...tabletopState.active].find(n=>cardContent.get(n).puzzle));
     const rewards=await page.evaluate(n=>cardContent.get(n).unlocks,puzzle);
+    await page.evaluate(n=>openZoom(n),puzzle);await page.locator('#zoomClose').click();
+    assert.equal(await page.evaluate(ids=>ids.some(n=>flippedNumbers.has(n)),rewards),false);
     // A correct-looking reward code is still premature until its puzzle is solved.
     await page.locator('#openCode').click();await page.fill('#discoveryCode',String(rewards[0]));
     await page.locator('#codeForm button[type="submit"]').click();
@@ -64,9 +66,18 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator('.card-drag-ghost').count(),0);
     assert.equal(await page.evaluate(ids=>ids.every(n=>tabletopState.discarded.has(n)),recipe.requires),true);
     await page.waitForFunction(()=>getComputedStyle(zoomOverlay).opacity==='1');await page.screenshot({path:path.join(out,'tabletop-made-item.png'),fullPage:true});
-    await page.getByRole('button',{name:'Enter clue code ↗',exact:true}).click();
-    assert.equal(await page.locator('#codeDialog').evaluate(e=>e.open),true);
-    await page.locator('#codeDialog .dialog-close').click();
+    const directRewards=recipe.unlocks;
+    const livesBeforeReward=await page.evaluate(()=>lives);
+    assert.equal(await page.locator('.tabletop-card[data-number="'+result+'"] .hint').textContent(),'Tap to read your discovery.');
+    await page.getByRole('button',{name:'Take '+(directRewards.length===1?'card ':'cards ')+directRewards.join(' and '),exact:true}).click();
+    assert.equal(await page.locator('#codeDialog').evaluate(e=>e.open),false);
+    assert.equal(await page.evaluate(ids=>ids.every(n=>flippedNumbers.has(n)),directRewards),true);
+    assert.equal(await page.evaluate(()=>lives),livesBeforeReward);
+    assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),result),true);
+    // Re-reading and closing an exhausted card cannot give duplicate rewards.
+    const afterReward=await page.evaluate(()=>flippedNumbers.size);
+    await page.evaluate(n=>openZoom(n),result);await page.locator('#zoomClose').click();
+    assert.equal(await page.evaluate(()=>flippedNumbers.size),afterReward);
     await page.locator('#openDiscards').click();assert.ok(await page.locator('#discardList button').count()>=3);
     await page.locator('#discardList button').first().click();assert.equal(await page.locator('#zoomOverlay').evaluate(e=>e.classList.contains('open')),true);
     await page.locator('#zoomClose').click();
@@ -75,6 +86,32 @@ const server=http.createServer((req,res)=>{
     assert.match(await page.locator('#codeFeedback').textContent(),/already/);assert.equal(await page.evaluate(()=>lives),before);
     await page.locator('#codeDialog .dialog-close').click();
     // Branch order varies: take reward codes forward and backward across seeds.
+    for(const dismissal of ['close','escape','backdrop']){
+      const claim=await page.evaluate(()=>{
+        startDeck('story');pendingSeed=345;performDeal();
+        for(let step=0;step<20;step++){
+          const pair=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)));
+          if(pair){combineTabletopCards(...pair[1].requires);return {num:pair[0],rewards:pair[1].unlocks,size:flippedNumbers.size};}
+          const p=[...tabletopState.active].find(n=>cardContent.get(n).puzzle&&!cardContent.get(n).puzzle.solved);
+          if(p!==undefined){const c=cardContent.get(p);c.puzzle.solved=true;onPuzzleSolved(c,p);}
+          const code=[...validCodeTargets()][0];if(code!==undefined)drawTabletopCard(code,'code');
+        }
+        throw Error('No reward source');
+      });
+      if(dismissal==='close')await page.locator('#zoomClose').click();
+      else if(dismissal==='escape')await page.keyboard.press('Escape');
+      else await page.locator('#zoomOverlay').click({position:{x:5,y:5}});
+      assert.equal(await page.evaluate(ids=>ids.every(n=>flippedNumbers.has(n)),claim.rewards),true);
+      assert.equal(await page.evaluate(()=>lives),3);
+      assert.equal(await page.evaluate(()=>flippedNumbers.size),claim.size+claim.rewards.length);
+      await page.evaluate(()=>closeZoom());
+      assert.equal(await page.evaluate(()=>flippedNumbers.size),claim.size+claim.rewards.length);
+    }
+    assert.equal(await page.evaluate(()=>{
+      const stale={num:[...flippedNumbers][0],content:cardContent.get([...flippedNumbers][0])};
+      startDeck('story');performDeal();const before=flippedNumbers.size;
+      collectTabletopRewards(stale);return before===flippedNumbers.size;
+    }),true);
     const results=await page.evaluate(()=>{
       let games=0,maxActive=0;const puzzleTypes=new Set();
       for(const book of STORY_BOOK)for(let seed=0;seed<20;seed++){

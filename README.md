@@ -3,16 +3,17 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.6.0 — the active table
+## Current release: 0.6.1 — the active table
 
 Choose **The Last Light**, **The Midnight Archive**, or **Pip Beyond the
 Garden**, then **Begin adventure**. The opening goes into your discoveries;
 just two leads start on the table. Typical play holds two or three active
 cards instead of a full spread.
 
-- Inspect cards to read clues and play puzzles. **Enter code** draws a card
-  named by an available clue or completed puzzle. Wrong or premature codes
-  cost a life; repeated discoveries do not.
+- Inspect cards to read clues and play puzzles. Story rewards have a **Take cards**
+  button and are also collected when you close the card. Table previews hide
+  next-card instructions. **Enter code** draws answers found in completed puzzles.
+  Wrong or premature codes cost a life; repeated discoveries do not.
 - **Drag one item onto another** to combine them. Matching items draw their
   result directly; no addition or sum-code entry is needed. **Combine…**
   provides a keyboard/tap item picker as an alternative. Unrelated item pairs
@@ -20,7 +21,7 @@ cards instead of a full spread.
 - Items waiting for later partners stay active. Cards whose instructions and
   recipe uses are all complete leave the table for **Discards** and remain
   readable there. Discovery state survives discarding. A crafted item needed
-  again stays active; clue-only results point to their next codes.
+  again stays active; clue-only results hand you the next cards when dismissed.
 
 Each story has ten combinations, eight puzzles, two interludes, an opening
 and an ending. All 42 progression cards must be discovered. Cryptogram,
@@ -112,9 +113,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.6.0.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.6.1.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.6.0/EscapeRoom-0.6.0.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.6.1/EscapeRoom-0.6.1.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

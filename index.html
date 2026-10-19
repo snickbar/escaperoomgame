@@ -4194,10 +4194,12 @@
   }
 
   function closeZoom() {
+    const rewardContext=zoomOverlay.classList.contains('open')?currentPuzzleContext:null;
     if (typeof tabletopZoomCode !== 'undefined') tabletopZoomCode.hidden=true;
     currentPuzzleContext=null;
     if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     zoomOverlay.classList.remove('open');
+    if (typeof collectTabletopRewards === 'function') collectTabletopRewards(rewardContext);
   }
 
   zoomCloseEl.addEventListener('click', closeZoom);
