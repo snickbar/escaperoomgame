@@ -1,6 +1,7 @@
 // Presentation only: puzzle answers and progression stay in the game engine.
 function puzzleTheme(content){return Number.isInteger(content.chapter)&&activeStory?activeStory.id:document.getElementById('storyChoice').value||'lighthouse';}
 function configurePuzzleArt(content){
+  zoomCardEl.classList.remove('has-picture-clue');
   const p=content.puzzle,theme=puzzleTheme(content);
   const boardWidth=puzzleBoardWidth();
   zoomPuzzleEl.style.setProperty("--puzzle-board-width",Math.min(boardWidth,innerHeight*.64)+"px");

@@ -26,7 +26,7 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator('#zoomOverlay').evaluate(e=>e.classList.contains('open')),true);
     await page.locator('#zoomClose').click();
     await page.waitForTimeout(300);
-    assert.equal(await page.locator('#table .card').count(),2);
+    assert.equal(await page.locator('#table .card').count(),6);
     assert.equal(await page.evaluate(()=>tabletopState.discarded.size),1);
     await page.locator('#table img').first().evaluate(image=>image.decode());
     await page.screenshot({path:path.join(out,'tabletop-start.png'),fullPage:true});
@@ -44,7 +44,7 @@ const server=http.createServer((req,res)=>{
       await page.locator('#openCode').click();await page.fill('#discoveryCode',String(number));await page.locator('#codeForm button[type="submit"]').click();
     };
     await page.evaluate(n=>openZoom(n),puzzle);
-    await page.getByRole('button',{name:'Take cards '+rewards.join(' and '),exact:true}).click();
+    await page.getByRole('button',{name:'Take '+(rewards.length===1?'card ':'cards ')+rewards.join(' and '),exact:true}).click();
     assert.equal(await page.evaluate(ids=>ids.every(n=>flippedNumbers.has(n)),rewards),true);
     assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),puzzle),true);
     assert.equal(await page.locator('#codeDialog').evaluate(e=>e.open),false);
@@ -121,10 +121,12 @@ const server=http.createServer((req,res)=>{
         storyChoiceEl.value=book.id;startDeck('story');pendingSeed=seed;performDeal();assistedRun=true;
         for(let step=0;step<100&&!winPending;step++){
           maxActive=Math.max(maxActive,tabletopState.active.size);
-          if(tabletopState.active.size>4)throw Error('Overwhelming table');
+          if(tabletopState.active.size>14)throw Error('Overwhelming table');
           const puzzles=[...tabletopState.active].filter(n=>cardContent.get(n).puzzle&&!cardContent.get(n).puzzle.solved);
           if(puzzles.length){const n=puzzles[0],c=cardContent.get(n);puzzleTypes.add(c.puzzle.type);openZoom(n);c.puzzle.solved=true;onPuzzleSolved(c,n);closeZoom();continue;}
-          const clues=[...tabletopState.active].filter(n=>cardContent.get(n).unlocks?.some(id=>!flippedNumbers.has(id)));
+          const picture=[...tabletopState.active].find(n=>cardContent.get(n).visualClue);
+          if(picture!==undefined){openZoom(picture);if(!drawTabletopCard(cardContent.get(picture).visualClue.answer,'code'))throw Error('Picture code rejected');closeZoom();continue;}
+          const clues=[...tabletopState.active].filter(n=>tabletopRewardNumbers({num:n,content:cardContent.get(n)}).length);
           if(clues.length){openZoom(seed%2?clues[0]:clues.at(-1));closeZoom();continue;}
           const pair=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)));
           if(pair){combineTabletopCards(...pair[1].requires);closeZoom();continue;}
@@ -132,11 +134,11 @@ const server=http.createServer((req,res)=>{
         }
         if(!winPending)throw Error('Ending not reached');
         if([...cardContent].some(([n,c])=>c.isProgress&&!flippedNumbers.has(n)))throw Error('Early ending');
-        if(tabletopState.discarded.size!==41)throw Error('Unfinished discard tracking');
+        if(tabletopState.discarded.size!==[...cardContent.values()].filter(c=>c.isProgress).length-1)throw Error('Unfinished discard tracking');
         games++;
       }
       return {games,maxActive,puzzleTypes:[...puzzleTypes].sort()};
-    });assert.equal(results.games,60);assert.deepEqual(results.puzzleTypes,['cryptogram','pipes','shapes','swap']);console.log('Active-table adventure playthroughs',results);
+    });assert.equal(results.games,60);assert.deepEqual(results.puzzleTypes,['cryptogram','deduction','pipes','shapes','swap']);console.log('Active-table adventure playthroughs',results);
     // Invalid item pairs lose exactly one life; the third error ends the run.
     const penalties=await page.evaluate(()=>{
       startDeck('story');pendingSeed=12;performDeal();
@@ -147,7 +149,7 @@ const server=http.createServer((req,res)=>{
       return {lives,mistakes,size,after:tabletopState.active.size,ended:runEnded};
     });assert.equal(penalties.lives,0);assert.equal(penalties.mistakes,3);assert.equal(penalties.size,penalties.after);assert.equal(penalties.ended,true);
     await page.waitForTimeout(600);assert.equal(await page.locator('#gameOverOverlay').evaluate(e=>e.classList.contains('open')),true);
-    await page.locator('#gameOverRestart').click();assert.equal(await page.locator('#table .card').count(),2);assert.equal(await page.evaluate(()=>lives),3);
+    await page.locator('#gameOverRestart').click();assert.equal(await page.locator('#table .card').count(),6);assert.equal(await page.evaluate(()=>lives),3);
     const layouts=[];
     for(const width of [320,390,768,1280]){
       await page.setViewportSize({width,height:900});
@@ -184,7 +186,7 @@ const server=http.createServer((req,res)=>{
     const installed=await browser.newContext({viewport:{width:390,height:844}});const app=await installed.newPage();
     await app.goto(base);await app.evaluate(async()=>await navigator.serviceWorker.ready);await app.waitForFunction(()=>!!navigator.serviceWorker.controller);
     await installed.setOffline(true);await app.reload();await app.locator('#beginAdventure').click();await app.locator('#zoomClose').click();
-    assert.equal(await app.locator('#table .card').count(),2);
+    assert.equal(await app.locator('#table .card').count(),6);
     const missing=await app.evaluate(async()=>{
       const paths=['tabletop.css','tabletop.js','art/scenes/lighthouse.png','art/scenes/library.png','art/scenes/lucy.png','art/scenes/lantern-empty.png','art/scenes/oil-flask.png','art/scenes/lantern-lit.png'];
       return (await Promise.all(paths.map(async p=>[p,(await fetch(p)).ok]))).filter(([,ok])=>!ok);

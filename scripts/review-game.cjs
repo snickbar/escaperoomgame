@@ -79,7 +79,7 @@ const server=http.createServer((req,res)=> {
       return {games,shapeHints,types:[...types]};
     });
     console.log('Generation and real eligibility checks',logic);
-    assert.deepEqual([...logic.types].sort(),['cryptogram','pipes','shapes','swap']);
+    assert.deepEqual([...logic.types].sort(),['cryptogram','deduction','pipes','shapes','swap']);
     const exhaustion=await page.evaluate(()=> {
       const check=(condition,message)=>{if(!condition)throw Error(message);};
       // Two instruction targets, a two-reward puzzle, a reused ingredient,
@@ -122,15 +122,14 @@ const server=http.createServer((req,res)=> {
       const el=n=>tableEl.querySelector('.card[data-number="'+n+'"]');
       const isUsed=n=>el(n).classList.contains('exhausted');
       const item=root[1].unlocks.find(n=>cardContent.get(n).kind==='object');
-      const clue=root[1].unlocks.find(n=>n!==item);
+      const clue=root[1].unlocks.find(n=>cardContent.get(n).puzzle);
       el(item).click();check(!isUsed(root[0]),'Actual root dimmed after only one flip');
-      el(clue).click();check(isUsed(root[0]),'Actual root did not dim');
+      root[1].unlocks.filter(n=>n!==item).forEach(n=>el(n).click());check(isUsed(root[0]),'Actual root did not dim');
       check(!isUsed(item),'Actual pending item dimmed');
       el(root[0]).click();check(zoomOverlay.classList.contains('open'),'Exhausted cards must remain readable');closeZoom();
       const p=cardContent.get(clue);p.puzzle.solved=true;onPuzzleSolved(p,clue);
       check(!isUsed(clue),'Actual puzzle dimmed before rewards');
-      el(p.unlocks[0]).click();check(!isUsed(clue),'Actual puzzle dimmed after only one reward');
-      el(p.unlocks[1]).click();check(isUsed(clue),'Actual puzzle did not dim after both rewards');
+      p.unlocks.forEach((n,i)=>{el(n).click();check(isUsed(clue)===(i===p.unlocks.length-1),'Actual puzzle reward exhaustion mismatch');});
       return {fixtures:true,actualClicks:true,zoom:true};
     });console.log('Card exhaustion checks',exhaustion);
     await page.locator('.card.exhausted').first().scrollIntoViewIfNeeded();
@@ -185,9 +184,9 @@ const server=http.createServer((req,res)=> {
     });assert.equal(penalties.lives,0);assert.equal(penalties.mistakes,3);assert.equal(penalties.flipped,false);
     // Replay via the public testing UI, not an internal seed helper.
     await page.evaluate(()=>{startDeck('story');testingPanel.hidden=false;});
-    await page.fill('#replayCode','ER2-library-12345678');
+    await page.fill('#replayCode','ER3-library-12345678');
     await page.evaluate(()=>document.getElementById('replayGame').click());
-    assert.equal(await page.evaluate(()=>adventureCode()),'ER2-library-12345678');
+    assert.equal(await page.evaluate(()=>adventureCode()),'ER3-library-12345678');
     // All puzzle renderers must survive switching between test and real play.
     for(const type of ['cryptogram','cipher','slider','swap','pipes','shapes']) {
       await page.evaluate(t=>openTestPuzzle(t),type);

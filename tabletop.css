@@ -178,3 +178,22 @@ button { -webkit-tap-highlight-color:transparent; }
   .table-heading .eyebrow { font-size:7px; letter-spacing:1px; }
 }
 @media(prefers-reduced-motion:reduce) { .just-drawn { animation:none; } }
+/* Compact previews keep several leads visible; full stories stay in detail views. */
+@media(max-width:560px){
+ .tabletop-card,.tabletop-card .card-inner,.tabletop-card .card-front { min-height:220px; }
+ .tabletop-card .card-front { padding:9px; gap:6px; }
+ .tabletop-card .front-icon,.tabletop-card .card-front.has-art .front-icon { height:78px; flex-basis:78px; }
+ .tabletop-card .clue-illustration { width:62px; height:72px; margin:5px auto; }
+ .tabletop-card .clue-illustration svg { width:52px; height:52px; }
+}
+@media(min-width:380px) and (max-width:560px){
+ .tabletop-story .table { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+ .tabletop-card .card-front { padding:8px; gap:5px; }
+ .tabletop-card .message { font-size:14px!important; }
+ .tabletop-card .hint { font-size:10px!important; line-height:1.35; }
+ .tabletop-card .card-kind { font-size:7px; letter-spacing:.3px; }
+ .tabletop-card .front-number { font-size:11px; padding:2px 4px; }
+ .tabletop-card-top { gap:3px; }
+ .combine-choice { font-size:10px; }
+}
+@media(max-width:560px){ .tabletop-card.flipped .card-inner { min-height:220px; } }

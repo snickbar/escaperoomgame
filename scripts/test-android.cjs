@@ -72,8 +72,8 @@ try {
   console.log('Saved setting survived restart.');
   tapText(changedSound,ui);screenshot('android-home.png');
   tapText('Begin adventure');
-  // First Back closes the opening story; the table starts with two leads.
-  waitForText('Your first two leads');shell('input','keyevent','4');
+  // First Back closes the opening story; the table starts with six leads.
+  waitForText('Your first six leads');shell('input','keyevent','4');
   ui=waitForText('The Last Light');assert.ok(ui.some(n=>n.text==='The Last Light'),'Offline story must be generated');
   screenshot('android-story.png');
   console.log('Story dealt offline.');

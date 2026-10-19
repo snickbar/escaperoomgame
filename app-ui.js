@@ -28,7 +28,7 @@ document.body.insertAdjacentHTML('beforeend', `
     <p>Local tools for checking a game. Revealing or solving answers marks the current run as practice, so it cannot set a record.</p>
     <label><input id="developerMode" type="checkbox" style="width:auto"> Show developer answers and controls</label>
     <label for="replayCode">Replay a Story Mode game</label>
-    <input id="replayCode" placeholder="ER2-lighthouse-12345678" autocomplete="off" spellcheck="false">
+    <input id="replayCode" placeholder="ER3-lighthouse-12345678" autocomplete="off" spellcheck="false">
     <button id="replayGame" type="button">Load game code</button>
     <button id="copyGameCode" type="button">Copy current code</button>
     <button id="solveTestPuzzle" type="button" data-dev hidden>Solve open puzzle</button>
@@ -114,8 +114,8 @@ puzzleRevealToggleEl.addEventListener('click',()=>assistedRun=true);
 const testStatus=document.getElementById('testingStatus');
 document.getElementById('replayGame').onclick=()=> {
   const raw=document.getElementById('replayCode').value.trim();
-  const match=/^ER2-(lighthouse|library|lucy)-([a-f0-9]{8})$/i.exec(raw);
-  if(!match) {testStatus.textContent='Enter a complete game code from this version, such as ER2-lighthouse-12345678.';return;}
+  const match=/^ER3-(lighthouse|library|lucy)-([a-f0-9]{8})$/i.exec(raw);
+  if(!match) {testStatus.textContent='Enter a complete game code from this version, such as ER3-lighthouse-12345678.';return;}
   storyChoiceEl.value=match[1].toLowerCase();
   pendingSeed=parseInt(match[2],16);
   startDeck('story'); performDeal();

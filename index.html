@@ -1515,6 +1515,7 @@
 <script src="story-content.js"></script>
 <script src="adventure-engine.js"></script>
 <script src="puzzle-art.js"></script>
+<script src="discovery-puzzles.js"></script>
 <script>
   const CARD_COUNT = 20;
   const STORY_NUMBER = 1;
@@ -1582,6 +1583,7 @@
   };
 
   const MINI_GAMES = {
+    deduction: {id:'deduction',label:'Logic: Three Places',icon:'🔎',tagline:'Use witness notes to deduce where an item is hidden',accent:'#95754d'},
     cryptogram: {
       id: 'cryptogram',
       label: 'Cryptogram',
@@ -3042,6 +3044,16 @@
         message = activeStory.recipes[n.chapter][7];
         hasBeat = true;
         hint = generator.hint;
+      } else if(n.kind==='logic') {
+        puzzle=makeDeductionPuzzle(unlockNums[0],activeStory.id);
+        puzzle.answers=unlockNums.slice();
+        message=puzzle.scene;
+        hint='Use the evidence to work out which place to search.';
+        hasBeat=true;
+      } else if(n.kind==='picture') {
+        message=pictureClueStory(activeStory.id,n.chapter);
+        hint='Find the number hidden in the picture, then use Enter code to draw that card.';
+        hasBeat=true;
       } else if (n.kind === 'object') {
         // No "combine with ___" pointer — the player has to notice the
         // pairing themselves from the artwork.
@@ -3057,7 +3069,7 @@
         // unless its one real next card just happens to already sit
         // immediately next to it on the true-ascending-order board, in
         // which case it occasionally gets to point that out directly.
-        message = activeStory.recipes[n.chapter][7];
+        message = investigationStoryBeat(activeStory.id,n.chapter);
         hint = directionForId[n.id] ? DIRECTION_HINTS[directionForId[n.id]] : describeUnlocks(unlockNums);
         hasBeat = true;
       }
@@ -3067,6 +3079,7 @@
         isStory: n.isStart, isWin: n.isWin, isSeed: n.isStart, hasBeat,
         unlocks: unlockNums, requires: requiresNums,
         message, hint, backItem, puzzle,
+        visualClue:n.kind==='picture'?{answer:unlockNums[0],theme:activeStory.id,variant:n.chapter===2?0:1}:null,
       });
     });
 
@@ -3271,6 +3284,7 @@
   // --- Zoom overlay ---
 
   function openZoom(num) {
+    toastEl.classList.remove('show');clearTimeout(toastTimeout);
     const content = cardContent.get(num);
     currentPuzzleContext={content,num};
     zoomCardEl.classList.toggle('story', content.isStory);
@@ -3305,7 +3319,10 @@
   function renderPuzzle(content, num, opts) {
     if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     configurePuzzleArt(content);
-    if (content.puzzle.type === 'slider') {
+    document.getElementById('deductionArea')?.remove();
+    if(content.puzzle.type==='deduction'){
+      renderDeductionPuzzle(content,num,opts);
+    } else if (content.puzzle.type === 'slider') {
       renderSliderPuzzle(content, num, opts);
     } else if (content.puzzle.type === 'swap') {
       renderSwapPuzzle(content, num, opts);
@@ -4204,6 +4221,7 @@
       const makers = {
         cryptogram: makeCryptogramPuzzle, cipher: makeCipherPuzzle,
         slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle, electric: makePipesPuzzle, shapes: makeShapesPuzzle,
+        deduction: target=>makeDeductionPuzzle(target,document.getElementById('storyChoice').value),
       };
       content = {
         isStory: false,

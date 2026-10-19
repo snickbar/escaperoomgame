@@ -91,3 +91,20 @@
 .puzzle-reference { width:min(300px,70vw); }
 #shapesTray .shapes-piece { padding:7px; }
 @media(max-width:400px){ .zoom-card.has-puzzle { padding:14px 8px; } .zoom-card.has-puzzle .zoom-message { font-size:14px; } }
+.deduction-area { width:100%; max-width:700px; background:#fbf4e1; border:1px solid #d0bd91; border-radius:10px; padding:18px; box-sizing:border-box; color:#35473c; }
+.deduction-area h3 { font:22px/1.3 Georgia,serif; margin:0 0 16px; }
+.deduction-evidence { display:grid; gap:12px; padding-left:25px; text-align:left; font:16px/1.6 system-ui,sans-serif; }
+.deduction-evidence li { padding:10px; background:#fffdf6; border-left:3px solid #b39a65; border-radius:4px; }
+.deduction-area p { font:14px/1.5 system-ui; }
+.deduction-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:18px 0; }
+.deduction-choices button { padding:16px 8px; background:#fffdf4; color:#32594f; font:15px/1.4 system-ui; border:1px solid #bcb798; border-radius:8px; min-height:60px; cursor:pointer; }
+.deduction-choices button[aria-pressed=true] { background:#31584f; color:#fffdf4; border-color:#31584f; }
+.deduction-choices button:disabled { opacity:.4; cursor:default; }
+.deduction-area .primary-action { width:100%; justify-content:center; }
+.deduction-area small { display:block; margin-top:12px; color:#7f654d; }
+.zoom-card.has-picture-clue { width:min(96vw,780px); aspect-ratio:unset; max-height:95dvh; overflow-y:auto; padding:22px; display:block; }
+.has-picture-clue .zoom-item-art { width:100%; max-width:none; aspect-ratio:unset; margin:18px 0; border-radius:10px; box-shadow:0 4px 12px #392c2020; }
+.has-picture-clue .zoom-item-art svg { width:100%; display:block; }
+.has-picture-clue .zoom-message { font-size:18px; padding:0 22px; }
+.has-picture-clue .primary-action { width:100%; margin-top:14px; justify-content:center; }
+@media(max-width:400px){ .deduction-area { padding:12px; } .deduction-evidence { font-size:14px; } .deduction-choices button { font-size:13px; padding:12px 5px; } }

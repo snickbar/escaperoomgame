@@ -1,5 +1,5 @@
-const GAME_VERSION = '0.7.2';
-const GAME_SCHEMA = 'ER2';
+const GAME_VERSION = '0.8.0';
+const GAME_SCHEMA = 'ER3';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
 let pendingSeed = null;
@@ -31,32 +31,30 @@ function withGameSeed(seed, action) {
 }
 function adventureCode() { return `${GAME_SCHEMA}-${activeStory.id}-${runSeed.toString(16).padStart(8,'0')}`; }
 
-// Five interleaved chapters, ten recipes. A pair's first item is found
-// before its partner; a second pair is already pending when the first pays off.
-// No fallback nodes, orphaned ingredients, or budget-dependent early endings.
+// Several independent leads are available together. Partners are spread
+// across other leads; every node still has a reachable, required use.
 function buildAdventureGraph() {
-  const nodes = [];
-  const add = (kind, chapter) => {
-    const n = { id:nodes.length, kind, chapter, depth:chapter, unlocks:[], requires:null, isStart:false, isWin:false };
-    nodes.push(n); return n;
-  };
-  const root = add('story',0); root.isStart = true;
-  let entry = root;
-  for (let i=0;i<10;i+=2) {
-    const a = add('object',i), b = add('object',i);
-    const c = add('combo',i); c.requires=[a.id,b.id];
-    const a2 = add('object',i+1), b2=add('object',i+1);
-    const c2=add('combo',i+1); c2.requires=[a2.id,b2.id];
-    const clue=add(i===2 || i===6 ? 'story':'puzzle',i);
-    const puzzle=add('puzzle',i+1);
-    entry.unlocks=[a.id,clue.id];
-    clue.unlocks=[a2.id,puzzle.id];
-    puzzle.unlocks=[b.id];
-    c.unlocks=[b2.id];
-    entry=c2;
-  }
-  const win=add('win',10); win.isWin=true;
-  entry.unlocks=[win.id];
+  const nodes=[];
+  const add=(kind,chapter)=>{const n={id:nodes.length,kind,chapter,depth:chapter,unlocks:[],requires:null,isStart:false,isWin:false};nodes.push(n);return n;};
+  const root=add('story',0);root.isStart=true;
+  const a=[],b=[],combo=[];
+  for(let i=0;i<10;i++){a.push(add('object',i));b.push(add('object',i));combo.push(add('combo',i));combo[i].requires=[a[i].id,b[i].id];}
+  const puzzles=Array.from({length:8},(_,i)=>add('puzzle',i));
+  const logic=[add('logic',1),add('logic',7)];
+  const pictures=[add('picture',2),add('picture',8)];
+  const stories=[add('story',0),add('story',6)];
+  const win=add('win',10);win.isWin=true;
+  const link=(from,...to)=>{from.unlocks=to.map(n=>n.id);};
+  link(root,a[0],a[1],a[2],puzzles[0],puzzles[1],stories[0]);
+  link(stories[0],a[3],logic[0]);link(logic[0],a[4],puzzles[2]);
+  link(puzzles[0],b[1]);link(puzzles[1],b[0]);
+  link(combo[0],a[5],puzzles[3]);link(combo[1],pictures[0]);link(pictures[0],b[2]);
+  link(combo[2],a[6],puzzles[4]);link(puzzles[2],b[3]);
+  link(combo[3],a[7],puzzles[5]);link(puzzles[3],b[4]);
+  link(combo[4],stories[1],logic[1]);link(stories[1],a[8],puzzles[6]);
+  link(puzzles[4],b[5]);link(combo[5],a[9],pictures[1]);
+  link(puzzles[5],b[6]);link(logic[1],b[7]);link(puzzles[6],b[8]);
+  link(pictures[1],puzzles[7]);link(puzzles[7],b[9]);link(combo[9],win);
   return nodes;
 }
 

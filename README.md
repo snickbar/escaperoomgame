@@ -3,7 +3,7 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.7.2 — larger, friendlier puzzles
+## Current release: 0.8.0 — several leads to follow
 
 Story selection uses visible illustrated buttons. Product UI should not use dropdown menus.
 Puzzle workspaces use most of the phone screen and adapt to orientation changes.
@@ -29,13 +29,14 @@ variant for the cryptogram. Artwork alone never changes story reward rules.
 
 Choose **The Last Light**, **The Midnight Archive**, or **Pip Beyond the
 Garden**, then **Begin adventure**. The opening goes into your discoveries;
-just two leads start on the table. Typical play holds two or three active
-cards instead of a full spread.
+six leads start on the table: three items, two puzzles, and a story clue.
+Several branches can be investigated in different orders, with six to eight
+active cards in the verified playthroughs. Early items may find partners later.
 
 - Inspect cards to read clues and play puzzles. Story and solved-puzzle rewards have a **Take cards**
   button and are also collected when you close the card. Table previews hide
   next-card instructions. **Enter code** remains an optional way to draw a known code;
-  taking rewards never requires typing it.
+  only the two hidden-number picture clues require entering their discovered numbers.
   Wrong or premature codes cost a life; repeated discoveries do not.
 - **Drag one item onto another** to combine them. Matching items draw their
   result directly; no addition or sum-code entry is needed. **Combine…**
@@ -46,9 +47,17 @@ cards instead of a full spread.
   readable there. Discovery state survives discarding. A crafted item needed
   again stays active; clue-only results hand you the next cards when dismissed.
 
-Each story has ten combinations, eight puzzles, two interludes, an opening
-and an ending. All 42 progression cards must be discovered. Cryptogram,
-Picture Puzzle, Shapes and Pipes each appear twice. The changing table uses
+Each story has ten combinations, eight existing puzzles, two logic deductions,
+two hidden-number picture clues, two story interludes, an opening and an ending. All 46 progression cards must be discovered. Cryptogram,
+Picture Puzzle, Shapes and Pipes each appear twice. Logic: Three Places adds
+uniquely solvable witness-note deductions, with two hints. Checking a wrong
+deduction costs a life in Story Mode; workshop practice has no penalty.
+
+Picture clues contain one number worked into an illustration. Their targets
+stay undiscovered until the player inspects the picture and submits its number
+through **I found a number** / **Enter code**. Closing a picture awards nothing.
+Ordinary story and solved-puzzle cards still use automatic Take rewards.
+The changing table uses
 numbered codes from 0–199 rather than positional neighbor clues. The deck
 counter shows undiscovered story cards, not trap guesses.
 
@@ -64,8 +73,8 @@ vector item drawings. Original painted recipe sets are retained.
 ## Testing and reporting problems
 
 The footer shows the app version and has **Testing tools**. Story game codes
-look like `ER2-lighthouse-12345678`. Copy the code to replay the same board,
-items and generated puzzles. ER2 codes refer to this generation schema; a
+look like `ER3-lighthouse-12345678`. Copy the code to replay the same board,
+items and generated puzzles. ER3 codes refer to this generation schema; a
 future change to generation should increment the schema rather than silently
 changing old codes.
 
@@ -136,9 +145,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.7.2.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.8.0.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.7.2/EscapeRoom-0.7.2.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.8.0/EscapeRoom-0.8.0.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

@@ -36,10 +36,10 @@ const combineDialog = document.getElementById('combineDialog');
 const codeFeedback = document.getElementById('codeFeedback');
 const tabletopZoomCode=document.createElement('button');
 tabletopZoomCode.className='primary-action';tabletopZoomCode.type='button';tabletopZoomCode.textContent='Take cards';tabletopZoomCode.hidden=true;
-tabletopZoomCode.onclick=closeZoom;zoomCardEl.appendChild(tabletopZoomCode);
+tabletopZoomCode.onclick=()=>{if(currentPuzzleContext?.content.visualClue)openCodeEntry();else closeZoom();};zoomCardEl.appendChild(tabletopZoomCode);
 function tabletopRewardNumbers(context) {
   if(!tabletopActive()||!tabletopState||runEnded||winPending||!context||context.num===null||
-    cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||
+    cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||context.content.visualClue||
     (context.content.puzzle&&!context.content.puzzle.solved))return [];
   return (context.content.unlocks||[]).filter(n=>!flippedNumbers.has(n)&&unlockedNumbers.has(n));
 }
@@ -50,6 +50,15 @@ function collectTabletopRewards(context) {
 }
 function configureTabletopZoom() {
   const context=currentPuzzleContext;
+  const picture=tabletopActive()&&tabletopState&&context?.content.visualClue;
+  zoomCardEl.classList.toggle('has-picture-clue',!!picture);
+  if(picture){
+    tabletopState.inspected.add(context.num);
+    zoomItemArtEl.hidden=false;zoomItemArtEl.innerHTML=hiddenPictureArtwork(picture);
+    zoomHintEl.hidden=false;zoomHintEl.textContent='Find the one number hidden in this picture. Use it to draw the next card.';
+    tabletopZoomCode.hidden=!context.content.unlocks.some(n=>!flippedNumbers.has(n));
+    tabletopZoomCode.textContent='I found a number';return;
+  }
   tabletopZoomCode.hidden=!tabletopActive()||!tabletopState||!context||context.num===null||
     !!(context.content.puzzle&&!context.content.puzzle.solved)||
     !(context.content.unlocks||[]).some(n=>!flippedNumbers.has(n));
@@ -60,6 +69,7 @@ function configureTabletopZoom() {
   if(tabletopActive()&&tabletopState&&context){
     tabletopZoomCode.hidden=!rewards.length;
     if(rewards.length)zoomHintEl.textContent='Take these cards to follow your next lead.';
+    else if(!context.content.puzzle&&context.content.unlocks?.some(n=>!flippedNumbers.has(n)))zoomHintEl.textContent='Keep this discovery. Finish the remaining leads, then return here for the ending.';
   }
 }
 for (const dialog of [codeDialog, discardDialog, combineDialog]) {
@@ -101,7 +111,7 @@ function renderTabletopHome() {
   hero.innerHTML=`<div class="hero-art"><img src="${sceneImage(book.id)}" alt="${book.title} adventure illustration"><span class="hero-stamp">A story to uncover</span></div>
     <div class="hero-copy"><div class="eyebrow">${book.id==='lighthouse'?'A race against the tide':book.id==='library'?'Secrets between the shelves':'A small dog. A big adventure.'}</div>
     <h2>${book.title}</h2><p>${book.intro.split('. ')[0]}.</p>
-    <div class="adventure-facts"><span>10 discoveries</span><span>A small, changing table</span>${p?.completed?'<span class="complete-badge">✓ Completed</span>':''}</div>
+  <div class="adventure-facts"><span>10 discoveries</span><span>Several leads at once</span>${p?.completed?'<span class="complete-badge">✓ Completed</span>':''}</div>
     <button class="primary-action" id="beginAdventure">${p?.completed?'Play this story again':'Begin adventure'} <span aria-hidden="true">→</span></button></div>`;
   document.getElementById('beginAdventure').onclick=()=>{
     startDeck('story');performDeal();
@@ -135,8 +145,8 @@ function dealTabletop() {
   });
   const root=[...cardContent].find(([,c])=>c.isSeed);
   root[1].unlocks.forEach(n=>flippedNumbers.add(n));
-  root[1].hint='Your first two leads are on the table. Inspect the puzzle, and keep the item for when you find its partner.';
-  tabletopState={active:new Set(flippedNumbers),discarded:new Set(),lastDraw:[],selected:null};
+  root[1].hint='Your first six leads are on the table. Investigate in any order, compare the evidence, and keep items for partners you may find later.';
+  tabletopState={active:new Set(flippedNumbers),discarded:new Set(),inspected:new Set(),lastDraw:[],selected:null};
   deckEl.dataset.empty='true';deckWrapEl.style.display='none';
   document.body.classList.add('tabletop-story');tabletopToolbar.hidden=false;tableHeading.hidden=false;
   refreshStoryUnlocks();syncTabletop();
@@ -191,8 +201,8 @@ function makeTabletopCard(number) {
   const content=cardContent.get(number);
   const item=content.backItem;
   const combinable=isCombinableItem(number);
-  const type=item?(combinable?'Item':'Discovery'):content.puzzle?(content.puzzle.solved?'Solved clue':'Puzzle'):content.isWin?'The ending':'Story clue';
-  const title=item?.name || (content.puzzle ? MINI_GAMES[content.puzzle.type].label : content.isWin ? 'Home safely' : 'A new lead');
+  const type=item?(combinable?'Item':'Discovery'):content.visualClue?'Picture clue':content.puzzle?(content.puzzle.solved?'Solved clue':'Puzzle'):content.isWin?'The ending':'Story clue';
+  const title=item?.name || (content.visualClue?'A closer look':content.puzzle ? MINI_GAMES[content.puzzle.type].label : content.isWin ? 'Home safely' : 'A new lead');
   const card=document.createElement('article');card.className='card tabletop-card flipped'+(combinable?' tabletop-item':'');
   card.dataset.number=number;card.tabIndex=0;card.setAttribute('role','button');
   card.setAttribute('aria-label',`${item?.name||content.title}, card ${number}. Tap to inspect${combinable?', or drag onto another item to combine.':'.'}`);
@@ -200,7 +210,7 @@ function makeTabletopCard(number) {
     <div class="tabletop-card-top"><span class="card-kind">${type}</span><span class="front-number">${number}</span></div>
     ${item?'<div class="front-icon">'+itemVisual(item)+'</div>':'<div class="clue-illustration" aria-hidden="true">'+puzzleStamp(content.puzzle?.type)+'</div>'}
     <h3 class="message">${title}</h3>
-    <p class="hint">${content.puzzle&&!content.puzzle.solved?'Tap to solve & discover what comes next.':combinable?'Drag onto another item':'Tap to read your discovery.'}</p>
+    <p class="hint">${content.visualClue?'Inspect the picture for a hidden number.':content.puzzle&&!content.puzzle.solved?'Tap to solve & discover what comes next.':combinable?'Drag onto another item':'Tap to read your discovery.'}</p>
     ${combinable?'<button class="combine-choice" type="button" aria-label="Choose an item to combine with '+item.name+'">Combine…</button>':''}
     </div></div>`;
   card.onclick=()=>{if(performance.now()<tabletopSuppressClickUntil||runEnded||winPending)return;openZoom(number);};
@@ -218,7 +228,7 @@ function validCodeTargets() {
   const targets=new Set();
   if(!tabletopState)return targets;
   cardContent.forEach((c,n)=>{
-    if(!flippedNumbers.has(n)||c.puzzle&&!c.puzzle.solved)return;
+    if(!flippedNumbers.has(n)||c.puzzle&&!c.puzzle.solved||c.visualClue&&!tabletopState.inspected.has(n))return;
     (c.unlocks||[]).forEach(target=>{if(!flippedNumbers.has(target))targets.add(target);});
   });
   // The final card also requires every discovery, as in the main progression rule.
@@ -307,20 +317,28 @@ function openDiscardPile() {
 function startTabletopDrag(event,number,card) {
   if(event.button!==0||event.target.closest('button')||runEnded||winPending)return;
   event.preventDefault();
-  const serial=runSerial,origin={x:event.clientX,y:event.clientY};let ghost=null,target=null,moved=false;
+  const serial=runSerial,origin={x:event.clientX,y:event.clientY};let ghost=null,target=null,moved=false,scrollFrame=null,lastPoint=null;
   const bounds=card.getBoundingClientRect();
   card.setPointerCapture(event.pointerId);
   function clearTarget(){target?.classList.remove('drop-target');target=null;}
   function cleanup(){
+    cancelAnimationFrame(scrollFrame);
     clearTarget();ghost?.remove();card.classList.remove('being-dragged');
     card.removeEventListener('pointermove',move);card.removeEventListener('pointerup',end);card.removeEventListener('pointercancel',cancel);
     if(card.hasPointerCapture(event.pointerId))card.releasePointerCapture(event.pointerId);
     tabletopDragCleanup=null;
   }
+  function autoScroll(){
+    if(!moved||!lastPoint||serial!==runSerial)return;
+    const y=lastPoint.y,delta=y<70?(y-70)*.25:y>innerHeight-110?(y-innerHeight+110)*.25:0;
+    if(delta){window.scrollBy(0,delta);clearTarget();const hit=document.elementFromPoint(lastPoint.x,y)?.closest('.tabletop-item');if(hit&&hit!==card){target=hit;target.classList.add('drop-target');}}
+    scrollFrame=requestAnimationFrame(autoScroll);
+  }
   function move(e){
     if(serial!==runSerial){cleanup();return;}
     if(!moved&&Math.hypot(e.clientX-origin.x,e.clientY-origin.y)<8)return;
     if(!moved){moved=true;ghost=card.cloneNode(true);ghost.className='card tabletop-card flipped card-drag-ghost';ghost.removeAttribute('role');ghost.setAttribute('aria-hidden','true');ghost.style.width=bounds.width+'px';ghost.style.height=bounds.height+'px';document.body.appendChild(ghost);card.classList.add('being-dragged');}
+    lastPoint={x:e.clientX,y:e.clientY};if(scrollFrame===null)scrollFrame=requestAnimationFrame(autoScroll);
     e.preventDefault();ghost.style.left=(e.clientX-(origin.x-bounds.left))+'px';ghost.style.top=(e.clientY-(origin.y-bounds.top))+'px';
     clearTarget();const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('.tabletop-item');
     if(hit&&hit!==card){target=hit;target.classList.add('drop-target');}
