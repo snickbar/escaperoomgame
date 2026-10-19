@@ -112,7 +112,7 @@ function renderDeductionPuzzle(content,num,opts={}){
    button.disabled=p.solved||p.eliminated.includes(i);button.setAttribute('aria-pressed',String(selected===i));button.onclick=()=>{selected=i;draw();};choices.appendChild(button);
   });
   check.disabled=selected===null||p.solved;check.hidden=p.solved;
-  puzzleHintEl.hidden=false;puzzleHintEl.textContent='💡 Hint ('+p.hintsRemaining+')';puzzleHintEl.disabled=p.solved||p.hintsRemaining<=0;
+  puzzleHintEl.hidden=false;puzzleHintEl.textContent=puzzleHintLabel(p);puzzleHintEl.disabled=p.solved||p.hintsRemaining<=0;
  }
  check.onclick=()=>{
   if(p.solved||selected===null||runEnded&&!isTest)return;

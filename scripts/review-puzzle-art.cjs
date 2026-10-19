@@ -61,7 +61,7 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
     return locked.length;
   });assert.ok(protectedLetters>0);
   await page.screenshot({path:path.join(out,'art-pencil-cryptogram.png')});
-  await page.evaluate(()=>openTestPuzzle('shapes'));await page.getByRole('button',{name:/Hint \(/}).click();await page.getByRole('button',{name:/Hint \(/}).click();
+  await page.evaluate(()=>openTestPuzzle('shapes'));await page.locator('#puzzleHint').click();await page.locator('#puzzleHint').click();
   await page.screenshot({path:path.join(out,'art-torn-document.png')});
   const restore=await page.evaluate(()=>{
    const p=currentPuzzleContext.content.puzzle,coverage=shapesCoverage(p);
@@ -102,7 +102,7 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
   const target={x:board.x+trial.border+4+trial.origin[1]*(trial.cell+2)+(Math.max(...trial.cells.map(c=>c[1]))*(trial.cell+2)+trial.cell)/2,y:board.y+trial.border+4+trial.origin[0]*(trial.cell+2)+(Math.max(...trial.cells.map(c=>c[0]))*(trial.cell+2)+trial.cell)/2};
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();await page.mouse.move(target.x,target.y,{steps:15});await page.mouse.up();
   assert.deepEqual(await page.evaluate(id=>currentPuzzleContext.content.puzzle.pieces.find(pc=>pc.id===id).placedOrigin,trial.id),trial.origin);
-  await page.getByRole('button',{name:/Hint \(/}).click();
+  await page.locator('#puzzleHint').click();
   assert.equal(await page.evaluate(()=>!!solveShapeRemainder(currentPuzzleContext.content.puzzle)),true);
   const layouts=[];
   for(const width of [320,390,768,1280])for(const type of ['pipes','electric','swap','cryptogram','shapes']){

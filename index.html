@@ -1478,7 +1478,7 @@
         <div class="shapes-grid" id="shapesGrid"></div>
         <div class="shapes-tray" id="shapesTray"></div>
       </div>
-      <button class="puzzle-hint" id="puzzleHint">&#128161; Hint (2)</button>
+      <button class="puzzle-hint" id="puzzleHint">&#128161; Hint</button>
       <div class="puzzle-feedback" id="puzzleFeedback"></div>
       <button class="puzzle-again" id="puzzleAgain" hidden>&#128260; Try Another</button>
       <button class="puzzle-reveal-toggle" id="puzzleRevealToggle">&#128269; Show Answer (dev)</button>
@@ -1520,7 +1520,9 @@
   const CARD_COUNT = 20;
   const STORY_NUMBER = 1;
   const MAX_LIVES = 3;
-  const PUZZLE_HINT_COUNT = 2;
+  // Unlimited while testing; set back to 2 to restore the limit.
+  const PUZZLE_HINT_COUNT = Infinity;
+  function puzzleHintLabel(p) { return '💡 Hint' + (Number.isFinite(p.hintsRemaining) ? ' (' + p.hintsRemaining + ')' : ''); }
   const TRAP_COUNT = 6;
   const CHAIN_LENGTH = CARD_COUNT - TRAP_COUNT;
   const PROGRESS_KEY = 'escapeRoomProgress';
@@ -3399,7 +3401,7 @@
     }
 
     function updateHintButton() {
-      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.textContent = puzzleHintLabel(p);
       puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
     }
 
@@ -3704,7 +3706,7 @@
     let hintedIndices = new Set();
 
     function updateHintButton() {
-      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.textContent = puzzleHintLabel(p);
       puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
     }
 
@@ -3833,7 +3835,7 @@
     const flowHistory=new Map();
 
     function updateHintButton() {
-      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.textContent = puzzleHintLabel(p);
       puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
     }
 
@@ -3978,7 +3980,7 @@
     let hintedPieceId = null;
 
     function updateHintButton() {
-      puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
+      puzzleHintEl.textContent = puzzleHintLabel(p);
       puzzleHintEl.disabled = p.solved || p.hintsRemaining <= 0;
     }
 
