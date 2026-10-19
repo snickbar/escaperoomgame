@@ -142,7 +142,10 @@ document.getElementById('solveTestPuzzle').onclick=()=> {
 };
 
 // First installation never forces a reload; updates wait for a deliberate tap.
-if('serviceWorker' in navigator) {
+const isAndroidApp=location.origin==='https://appassets.androidplatform.net';
+if(isAndroidApp) {
+  document.getElementById('updateStatus').textContent='Android app · Ready to play offline';
+} else if('serviceWorker' in navigator) {
   let registration, applying=false;
   const updateButton=document.getElementById('updateApp');
   function offerUpdate() {

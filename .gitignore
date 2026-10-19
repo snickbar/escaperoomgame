@@ -1,2 +1,7 @@
 .qa-output/
 node_modules/
+android/.gradle/
+android/**/build/
+android/local.properties
+android/.signing/
+dist/

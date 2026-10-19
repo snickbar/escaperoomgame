@@ -5,12 +5,13 @@ const playwright=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root=path.resolve(__dirname,'..');
 const out=path.join(root,'.qa-output');fs.mkdirSync(out,{recursive:true});
 const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml'};
-let servedCacheVersion='v41';
+const sourceCacheVersion=fs.readFileSync(path.join(root,'sw.js'),'utf8').match(/escape-room-(v\d+)/)[1];
+let servedCacheVersion=sourceCacheVersion;
 const server=http.createServer((req,res)=> {
   let p=path.resolve(root,'.'+decodeURIComponent(new URL(req.url,'http://localhost').pathname));
   if(p===root)p=path.join(root,'index.html');
   if(!p.startsWith(root+path.sep)){res.writeHead(403).end();return;}
-  fs.readFile(p,(err,data)=>{res.writeHead(err?404:200,{'Content-Type':mime[path.extname(p)]||'application/octet-stream','Cache-Control':'no-store'});res.end(err?'Missing file':p.endsWith(path.sep+'sw.js')?data.toString().replace('escape-room-v41','escape-room-'+servedCacheVersion):data);});
+  fs.readFile(p,(err,data)=>{res.writeHead(err?404:200,{'Content-Type':mime[path.extname(p)]||'application/octet-stream','Cache-Control':'no-store'});res.end(err?'Missing file':p.endsWith(path.sep+'sw.js')?data.toString().replace('escape-room-'+sourceCacheVersion,'escape-room-'+servedCacheVersion):data);});
 });
 (async()=> {
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
@@ -244,18 +245,18 @@ const server=http.createServer((req,res)=> {
     const app=await installed.newPage();await app.goto(base);
     await app.evaluate(async()=>{await navigator.serviceWorker.ready;});
     await app.waitForFunction(()=>!!navigator.serviceWorker.controller);
-    const cached=await app.evaluate(async()=>{const c=await caches.open('escape-room-v41');return(await c.keys()).length;});
+    const cached=await app.evaluate(async(version)=>{const c=await caches.open('escape-room-'+version);return(await c.keys()).length;},sourceCacheVersion);
     assert.ok(cached>=150);
     await installed.setOffline(true);await app.reload();await app.waitForFunction(()=>typeof updateAdventureStatus==='function');
     await app.evaluate(()=>{startDeck('story');pendingSeed=100;performDeal();});
     const offlineCards=await app.locator('.card').count();assert.ok(offlineCards>=54 && offlineCards<=72);
     await installed.setOffline(false);
-    servedCacheVersion='v42';
+    servedCacheVersion='v'+(Number(sourceCacheVersion.slice(1))+1);
     await app.evaluate(async()=>{const reg=await navigator.serviceWorker.getRegistration();await reg.update();});
     await app.waitForFunction(()=>!document.getElementById('updateApp').hidden);
     assert.equal(await app.evaluate(()=>runSeed),100);
     await app.locator('#updateApp').click();
-    await app.waitForFunction(async()=>!!(await caches.has('escape-room-v42')));
+    await app.waitForFunction(async(version)=>!!(await caches.has('escape-room-'+version)),servedCacheVersion);
     console.log('Offline reopen and non-interrupting update passed; cached assets:',cached);
     await installed.close();
     fs.writeFileSync(path.join(out,'review-results.json'),JSON.stringify({logic,layout,fullUI,penalties,errors,touchDrag:true,offline:true,updates:true},null,2));

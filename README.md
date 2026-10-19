@@ -87,3 +87,13 @@ Source image exports in the repository root remain untracked and untouched.
 
 Changes should be committed and pushed together after verification, per the
 project owner's standing preference.
+
+## Installable Android version
+
+The game can also be packaged as an offline Android APK. See
+[`android/README.md`](android/README.md) for building, signing and installation.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.5.0.apk`.
+
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.5.0/EscapeRoom-0.5.0.apk)
+on your phone, open it and choose Install. Android 8.0 or newer is required.
+The app works offline; its saved progress is separate from the browser version.

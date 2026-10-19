@@ -1,0 +1,58 @@
+plugins { id 'com.android.application' }
+
+def signingFile = rootProject.file('.signing/signing.properties')
+def signing = new Properties()
+if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+
+android {
+    namespace 'com.snickbar.escaperoom'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.snickbar.escaperoom'
+        minSdk 26
+        targetSdk 35
+        versionCode 50001
+        versionName '0.5.0'
+    }
+    buildFeatures { buildConfig true }
+    signingConfigs {
+        release {
+            if (signingFile.exists()) {
+                storeFile rootProject.file('.signing/escape-room.jks')
+                storePassword signing.getProperty('storePassword')
+                keyAlias 'escape-room'
+                keyPassword signing.getProperty('storePassword')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/gameAssets')
+}
+
+// Deliberate allowlist: never package raw exports, signing keys, source control,
+// test output or other files from the developer's computer.
+def bundleGame = tasks.register('bundleGame', Sync) {
+    from(rootProject.projectDir.parentFile) {
+        include 'index.html', 'gallery.html', 'app-ui.js', 'adventure-engine.js',
+                'story-content.js', 'story-assets.json', 'manifest.json',
+                'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
+                'art/items/**', 'art/story/**'
+    }
+    into layout.buildDirectory.dir('generated/gameAssets/game')
+}
+tasks.named('preBuild').configure { dependsOn bundleGame }
+tasks.matching { it.name == 'validateSigningRelease' }.configureEach {
+    doFirst {
+        if (!signingFile.exists()) throw new GradleException('Run scripts/build-android.ps1 to create the local signing key first.')
+    }
+}
+dependencies { implementation 'androidx.webkit:webkit:1.14.0' }
