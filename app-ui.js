@@ -36,6 +36,7 @@ updateSound();
 soundToggle.onclick=()=> { soundEnabled=!soundEnabled; updateSound(); try {localStorage.setItem('escapeRoomSound',soundEnabled?'on':'off');}catch{} };
 
 function updateAdventureStatus() {
+  if (typeof tabletopActive === 'function' && tabletopActive()) { renderTabletopStatus(); return; }
   const el=document.getElementById('adventureStatus');
   if(currentMode!=='story' || !cardContent.size || deckEl.dataset.empty!=='true') {el.replaceChildren();return;}
   gameTitleEl.textContent=activeStory.title;
@@ -57,6 +58,7 @@ function updateAdventureStatus() {
 
 let fitting=false;
 function fitTableText() {
+  if (typeof tabletopActive === 'function' && tabletopActive()) return;
   if(fitting || gameScreenEl.hidden) return;
   fitting=true;
   tableEl.querySelectorAll('.card-front').forEach(face=> {

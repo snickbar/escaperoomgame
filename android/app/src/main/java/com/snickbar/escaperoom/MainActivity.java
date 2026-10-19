@@ -26,7 +26,7 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         FrameLayout root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(20, 22, 28));
+        root.setBackgroundColor(Color.rgb(243, 239, 228));
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
                 android.graphics.Insets bars = insets.getInsets(
@@ -40,9 +40,20 @@ public final class MainActivity extends Activity {
             return insets.consumeSystemWindowInsets();
         });
         game = new WebView(this);
-        game.setBackgroundColor(Color.rgb(20, 22, 28));
+        game.setBackgroundColor(Color.rgb(243, 239, 228));
         root.addView(game, new FrameLayout.LayoutParams(-1, -1));
         setContentView(root);
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().getInsetsController().setSystemBarsAppearance(
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS |
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS |
+                android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS);
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR |
+                android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::onBackPressed);
@@ -85,6 +96,7 @@ public final class MainActivity extends Activity {
             return;
         }
         game.evaluateJavascript("(() => {" +
+            "const dialog=document.querySelector('dialog[open]'); if(dialog){dialog.close(); return 'closed';}" +
             "if(typeof closeZoom==='function' && document.getElementById('zoomOverlay')?.classList.contains('open')) {closeZoom(); return 'closed';}" +
             "const mini=document.getElementById('miniGamesScreen');" +
             "if(mini && !mini.hidden) {goHome(); return 'closed';}" +

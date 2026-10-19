@@ -88,5 +88,21 @@ The three adventures now have authored plots and connected chapter payoffs,
 but recipe order is intentionally authored; random seeds vary numbers,
 traps, puzzle instances and puzzle-type order. There is no authenticated
 account system or cross-device save. Active games do not resume after reload.
-Full painted replacements, illustrated environment scenes, hidden-number
-artwork and advanced puzzle animations remain a later art pass.
+Full painted replacements, hidden-number artwork and advanced puzzle
+animations remain a later art pass.
+
+## Version 0.6.0 visual direction
+
+The primary experience now uses warm paper, deep teal actions, brass accents
+and a compact active table with draw and discard piles. Six new generated
+illustrations establish the painted direction: three landscape story covers
+and a transparent lantern + oil + lit lantern triad. Ninety editable vector
+item drawings have been recolored for pale paper backgrounds. The original
+painted recipe sets are preserved. Puzzle cards have matching vector stamps.
+
+The lantern triad is the first painted comparison set. The other 29 story
+triads still use vector art; they have not all been repainted. Later replacements
+should match the covers' gouache texture, remain recognizable on phones, and
+show meaningful before/after changes. Hidden numbers still need deliberate
+placement and play-testing. Positional neighbor clues are intentionally absent
+from the changing table because removing cards would invalidate them.

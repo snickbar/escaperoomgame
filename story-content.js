@@ -55,7 +55,7 @@ const STORY_BOOK = [
 
 const STORY_RECIPES = STORY_BOOK.flatMap(story => story.recipes.map((r, chapter) => ({
   theme: story.id, chapter, title: r[2], aftermath: r[6], clue: r[7],
-  a: { name: r[0], img: `art/story/${story.id}-${chapter}-a.svg` },
-  b: { name: r[1], img: `art/story/${story.id}-${chapter}-b.svg` },
-  c: { name: r[2], img: `art/story/${story.id}-${chapter}-c.svg` },
+  a: { name: r[0], img: story.id==='lighthouse'&&chapter===0 ? 'art/scenes/lantern-empty.png' : `art/story/${story.id}-${chapter}-a.svg` },
+  b: { name: r[1], img: story.id==='lighthouse'&&chapter===0 ? 'art/scenes/oil-flask.png' : `art/story/${story.id}-${chapter}-b.svg` },
+  c: { name: r[2], img: story.id==='lighthouse'&&chapter===0 ? 'art/scenes/lantern-lit.png' : `art/story/${story.id}-${chapter}-c.svg` },
 })));

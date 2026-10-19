@@ -16,7 +16,7 @@ repository root in PowerShell:
 ```
 
 The Gradle wrapper downloads its pinned Gradle distribution and dependencies
-on the first build. Output: `dist/EscapeRoom-0.5.1.apk`. The build includes
+on the first build. Output: `dist/EscapeRoom-0.6.0.apk`. The build includes
 Android lint and signature verification. Use `-Offline` for a cached build.
 
 The first build creates a signing key and random password under
@@ -38,7 +38,7 @@ not a Google Play listing. Completed decks, records and sound preferences are
 saved separately from the browser/PWA; existing browser progress is not copied.
 Reinstalling an update keeps app data; uninstalling clears it. An active game
 is not restored if Android closes the app process. Rotation preserves the
-running page. Back closes a puzzle, returns from the gallery or mini-games,
+running page. Back closes code/discard/item dialogs or a puzzle, returns from the gallery or mini-games,
 and asks before abandoning a deck or exiting.
 
 For native WebView inspection, build `assembleDebug` and inspect the debug

@@ -12,11 +12,19 @@ const out=path.join(root,'.qa-output');fs.mkdirSync(out,{recursive:true});
 const run=(...args)=>execFileSync(adb,['-s',serial,...args],{encoding:'utf8',timeout:60000}).trim();
 const shell=(...args)=>run('shell',...args);
 function nodes() {
-  try {shell('uiautomator','dump','/sdcard/escape-test.xml');}
-  catch(error) {if(!String(error.stdout).includes('UI hierchary dumped'))throw error;}
-  const xml=shell('cat','/sdcard/escape-test.xml');
-  return [...xml.matchAll(/<node\s+([^>]+)>?/g)].map(match=>Object.fromEntries(
-    [...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(([,key,value])=>[key,value.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')])));
+  // The preview Android image occasionally reports a null root while a
+  // window is changing. Never reuse yesterday's dump as the current screen.
+  for(let attempt=0;attempt<5;attempt++) {
+    let output;
+    try {output=shell('uiautomator','dump','/sdcard/escape-test.xml');}
+    catch(error) {output=String(error.stdout);if(!output.includes('dumped'))throw error;}
+    if(!output.includes('dumped'))continue;
+    const xml=shell('cat','/sdcard/escape-test.xml');
+    const list=[...xml.matchAll(/<node\s+([^>]+)>?/g)].map(match=>Object.fromEntries(
+      [...match[1].matchAll(/([\w-]+)="([^"]*)"/g)].map(([,key,value])=>[key,value.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')])));
+    if(list.some(n=>n.text))return list;
+  }
+  throw Error('Android accessibility screen did not become ready.');
 }
 function waitForText(text) {
   const deadline=Date.now()+25000;
@@ -24,8 +32,15 @@ function waitForText(text) {
   throw Error('Android screen did not become ready: '+text);
 }
 function tapText(text, list=nodes()) {
-  const node=list.find(n=>(n.text||'').includes(text));assert.ok(node,'Missing visible control: '+text);
-  tapNode(node);
+  for(let attempt=0;attempt<5;attempt++) {
+    const node=list.find(n=>{
+      const b=(n.bounds||'').match(/-?\d+/g)?.map(Number);
+      return (n.text||'').includes(text)&&b&&b[2]>b[0]&&b[3]>b[1];
+    });
+    if(node){tapNode(node);return;}
+    shell('input','swipe','540','1700','540','600','300');list=nodes();
+  }
+  throw Error('Missing visible control: '+text);
 }
 function tapNode(node) {
   const bounds=node.bounds.match(/\d+/g).map(Number);
@@ -54,19 +69,23 @@ try {
   assert.ok(ui.some(n=>n.text===changedSound),'Sound preference must survive restart');
   console.log('Saved setting survived restart.');
   tapText(changedSound,ui);screenshot('android-home.png');
-  tapText('Story A branching');
-  ui=waitForText('Click the deck to deal');
-  tapNode(ui.find(n=>n['resource-id']==='deck'));
+  tapText('Begin adventure');
+  // First Back closes the opening story; the table starts with two leads.
+  waitForText('Your first two leads');shell('input','keyevent','4');
   ui=waitForText('The Last Light');assert.ok(ui.some(n=>n.text==='The Last Light'),'Offline story must be generated');
   screenshot('android-story.png');
   console.log('Story dealt offline.');
+  tapText('Enter code');waitForText('What did you find?');shell('input','keyevent','4');
+  // The system keyboard can consume the first Back before the HTML dialog.
+  if(nodes().some(n=>n.text==='What did you find?'))shell('input','keyevent','4');
+  assert.ok(!nodes().some(n=>n.text==='What did you find?'),'Back must close the code dialog');
   shell('input','keyevent','4');
   ui=nodes();assert.ok(ui.some(n=>n.text==='Return to home?'),'Back must ask before abandoning a deck');
   tapNode(ui.find(n=>n['resource-id']==='android:id/button2'));
   assert.ok(nodes().some(n=>n.text==='The Last Light'),'Cancel must preserve the game');
   shell('input','keyevent','4');
   tapNode(waitForText('Return to home?').find(n=>n['resource-id']==='android:id/button1'));
-  tapText('Mini-Games Try out');tapText('Shapes');
+  tapText('Quick play');tapText('Mini-Games Try out');tapText('Shapes');
   ui=nodes();assert.ok(ui.some(n=>(n.text||'').toLowerCase().includes('shapes test')),'Native puzzle must render');
   screenshot('android-shapes.png');
   shell('input','keyevent','4');
@@ -78,7 +97,8 @@ try {
   ui=nodes();assert.ok(ui.some(n=>(n.text||'').includes('Art Gallery')),'Bundled gallery must load');
   screenshot('android-gallery.png');
   shell('input','keyevent','4');
-  assert.ok(nodes().some(n=>n.text==='Story adventure'),'Back from gallery must restore home');
+  shell('input','swipe','540','500','540','1800','300');
+  assert.ok(waitForText('Story adventure').some(n=>n.text==='Story adventure'),'Back from gallery must restore home');
   console.log('Signed APK installed; offline home/story/puzzle/gallery, native Back and saved preference checks passed.');
 } finally {
   shell('svc','wifi','enable');shell('svc','data','enable');

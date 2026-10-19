@@ -3,28 +3,39 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.5.1
+## Current release: 0.6.0 — the active table
 
-Story Mode has three complete adventures: **The Last Light**, **The Midnight
-Archive**, and **Pip Beyond the Garden**. Choose an adventure above the deck menu,
-then select Story and deal.
+Choose **The Last Light**, **The Midnight Archive**, or **Pip Beyond the
+Garden**, then **Begin adventure**. The opening goes into your discoveries;
+just two leads start on the table. Typical play holds two or three active
+cards instead of a full spread.
 
-Each adventure contains ten story-specific combinations, eight puzzles, two
-interlude clue cards, an opening and an ending. The table has 54–72 cards;
-42 are part of the adventure and the rest are traps. Cards remain strictly
-sorted from 0–199 in four columns on every device. Combination numbers are
-the actual sum of two different ingredient cards. Items from different pairs
-are discovered before their partners, so several discoveries can be pending.
+- Inspect cards to read clues and play puzzles. **Enter code** draws a card
+  named by an available clue or completed puzzle. Wrong or premature codes
+  cost a life; repeated discoveries do not.
+- **Drag one item onto another** to combine them. Matching items draw their
+  result directly; no addition or sum-code entry is needed. **Combine…**
+  provides a keyboard/tap item picker as an alternative. Unrelated item pairs
+  cost a life. Dropping outside an item or cancelling a drag does not.
+- Items waiting for later partners stay active. Cards whose instructions and
+  recipe uses are all complete leave the table for **Discards** and remain
+  readable there. Discovery state survives discarding. A crafted item needed
+  again stays active; clue-only results point to their next codes.
 
-Cryptogram, Number Swap, Shapes and Pipes each appear twice in a Story game,
-with a shuffled puzzle bag. Directional clues are optional, capped at two,
-and only replace a numbered instruction when the actual sorted layout supports
-the direction. The ending requires all adventure cards and puzzles.
+Each story has ten combinations, eight puzzles, two interludes, an opening
+and an ending. All 42 progression cards must be discovered. Cryptogram,
+Number Swap, Shapes and Pipes each appear twice. The changing table uses
+numbered codes from 0–199 rather than positional neighbor clues. The deck
+counter shows undiscovered story cards, not trap guesses.
 
-All modes have three lives. An incorrect or premature flip costs a life and
-does not reveal the card. Open a face-up card to read its full text and play
-its puzzle. Table thumbnails show short titles and complete instructions;
-longer prose stays in the readable detail view and adventure journal.
+There are three lives, plus an ending with time, errors and completion/records.
+The home screen's **Quick play & puzzle workshop** contains the original
+Easy/Medium/Hard grid modes, mini-games and the art gallery. They keep their
+original flip/sum rules.
+
+The paper, teal and brass interface has three painted story covers, a new
+lantern/oil/result illustration set, matching puzzle stamps and 90 restyled
+vector item drawings. Original painted recipe sets are retained.
 
 ## Testing and reporting problems
 
@@ -68,6 +79,11 @@ game-over input blocking, real mobile touch dragging, the gallery, an offline
 reopen, and a waiting service-worker update. Screenshots and results go in the
 ignored `.qa-output/` folder.
 
+The active-table suite also completes 60 adventures across all three themes
+with different reward orders. It checks the small active-card limit, code
+gating, real mouse and touch combinations, cancelled drags, wrong pairs,
+discards, clue-to-code buttons, restart cleanup and all six new assets offline.
+
 ## Content and artwork
 
 - `story-content.js`: three plots, chapter clues, payoffs and 30 new recipes.
@@ -75,6 +91,10 @@ ignored `.qa-output/` folder.
   and exact-cover Shapes hint assistance.
 - `index.html`: game interface and puzzle renderers; existing modes remain.
 - `app-ui.js`: player controls, replay/report tools and update handling.
+- `tabletop.js` / `tabletop.css`: active-table adventures, codes, drag/drop,
+  discards and the warm interface. `tabletopEnabled=false` exists only for
+  regression coverage of the former Story grid.
+- `art/scenes/`: six generated illustrations, all bundled for offline play.
 - `art/items/`: original 48 illustrated item images (16 recipes).
 - `art/story/`: 90 editable SVG item illustrations and three story covers.
 - `scripts/make-story-art.cjs`: regenerates story illustrations and the offline
@@ -92,13 +112,13 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.5.1.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.6.0.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.5.1/EscapeRoom-0.5.1.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.6.0/EscapeRoom-0.6.0.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 
-Revealed cards dim once all their uses are complete: every instructed/reward
+In the classic grid, revealed cards dim once all their uses are complete: every instructed/reward
 card has been opened, their puzzle is solved, and every recipe needing the
 item has been revealed. Waiting ingredients remain bright, including reused
 items and crafted items needed again later. Dimmed cards remain tappable for

@@ -6,7 +6,7 @@
 <title>Escape Room Card Game</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#14161c">
+<meta name="theme-color" content="#f3efe4">
 
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -1408,12 +1408,14 @@
   .pipe-tile.connected .pipe-arm, .pipe-tile.connected .pipe-hub { box-shadow:0 0 7px #7ee6a850; }
   @media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
 </style>
+<link rel="stylesheet" href="tabletop.css">
 </head>
 <body>
 
 <div id="homeScreen">
-  <h1>Escape Room Card Game</h1>
-  <p class="home-subtitle">Choose a deck to play</p>
+  <p class="brand-kicker">A little mystery. A great escape.</p>
+  <h1>Escape Room</h1>
+  <p class="home-subtitle">Every discovery changes the story.</p>
   <label class="story-picker" for="storyChoice">Story adventure
     <select id="storyChoice"></select>
   </label>
@@ -2509,9 +2511,11 @@
     `;
     galleryTile.addEventListener('click', () => { window.location.href = 'gallery.html'; });
     deckGridEl.appendChild(galleryTile);
+    if (typeof renderTabletopHome === 'function') renderTabletopHome();
   }
 
   function goHome() {
+    if (typeof resetTabletopUI === 'function') resetTabletopUI();
     runSerial++; runEnded=true;
     winPending=false; currentPuzzleContext=null;
     toastEl.classList.remove('show'); clearTimeout(toastTimeout);
@@ -2550,6 +2554,7 @@
   miniGamesHomeLinkEl.addEventListener('click', goHome);
 
   function startDeck(modeId) {
+    if (typeof resetTabletopUI === 'function') resetTabletopUI();
     runSerial++;
     winPending=false; currentPuzzleContext=null;
     toastEl.classList.remove('show'); clearTimeout(toastTimeout);
@@ -2884,6 +2889,7 @@
     return assignAdventureItems(nodes);
   }  function describeUnlocks(nums) {
     if (!nums || nums.length === 0) return '';
+    if (typeof tabletopActive === 'function' && tabletopActive()) return 'Enter ' + (nums.length === 1 ? 'code ' : 'codes ') + nums.join(' and ') + ' to draw ' + (nums.length === 1 ? 'a new card.' : 'new cards.');
     if (nums.length === 1) return 'Flip over card ' + nums[0] + '!';
     if (nums.length === 2) return 'Flip over cards ' + nums.join(' and ') + '!';
     // 3+ (an area hub whose shape didn't fit, falling back to named
@@ -3077,6 +3083,7 @@
   function onPuzzleSolved(content,num) {
     if (num !== null && currentMode === 'story' && cardContent.get(num) === content) refreshStoryUnlocks();
     if (num !== null && cardContent.get(num) === content) refreshCardExhaustion();
+    if (typeof configureTabletopZoom === 'function') configureTabletopZoom();
   }  function tableSizeForMode(mode) {
     // Story Mode's table size isn't decided until it's dealt, so the
     // pre-deal preview shows the range rather than a committed number.
@@ -3089,6 +3096,7 @@
   }
 
   function performDeal() {
+    if (typeof resetTabletopUI === 'function') resetTabletopUI();
     runSerial++;
     winPending=false; currentPuzzleContext=null;
     toastEl.classList.remove('show'); clearTimeout(toastTimeout);
@@ -3103,6 +3111,7 @@
   }
 
   function dealGeneratedCards() {
+    if (typeof tabletopActive === 'function' && tabletopActive()) { dealTabletop(); return; }
     tableEl.innerHTML = '';
     winOverlayEl.classList.remove('open');
     gameOverOverlayEl.classList.remove('open');
@@ -3272,6 +3281,7 @@
     }
 
     zoomOverlay.classList.add('open');
+    if (typeof configureTabletopZoom === 'function') configureTabletopZoom();
   }
 
   // Dispatches to the right puzzle-type renderer. Each renderer owns its
@@ -4184,6 +4194,7 @@
   }
 
   function closeZoom() {
+    if (typeof tabletopZoomCode !== 'undefined') tabletopZoomCode.hidden=true;
     currentPuzzleContext=null;
     if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     zoomOverlay.classList.remove('open');
@@ -4204,5 +4215,6 @@
 </script>
 
 <script src="app-ui.js"></script>
+<script src="tabletop.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@ const fs=require('fs'),path=require('path'),http=require('http'),assert=require(
 const playwright=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root=path.resolve(__dirname,'..');
 const out=path.join(root,'.qa-output');fs.mkdirSync(out,{recursive:true});
-const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml'};
+const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.jpg':'image/jpeg','.png':'image/png','.svg':'image/svg+xml'};
 const sourceCacheVersion=fs.readFileSync(path.join(root,'sw.js'),'utf8').match(/escape-room-(v\d+)/)[1];
 let servedCacheVersion=sourceCacheVersion;
 const server=http.createServer((req,res)=> {
@@ -22,6 +22,9 @@ const server=http.createServer((req,res)=> {
     const page=await context.newPage();
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     await page.goto(base);await page.waitForFunction(()=>typeof updateAdventureStatus==='function');
+    // These checks retain coverage for the original full-grid presentation.
+    // review-tabletop.cjs exercises the new default active-table adventure.
+    await page.evaluate(()=>{tabletopEnabled=false;});
     assert.equal(await page.locator('#storyChoice option').count(),3);
     await page.screenshot({path:path.join(out,'home.png'),fullPage:true});
     console.log('Home loaded',errors);
@@ -301,11 +304,13 @@ const server=http.createServer((req,res)=> {
     // A first install, an offline reopen, and an update waiting without interrupting a game.
     const installed=await browser.newContext({viewport:{width:390,height:844}});
     const app=await installed.newPage();await app.goto(base);
+    await app.evaluate(()=>{tabletopEnabled=false;});
     await app.evaluate(async()=>{await navigator.serviceWorker.ready;});
     await app.waitForFunction(()=>!!navigator.serviceWorker.controller);
     const cached=await app.evaluate(async(version)=>{const c=await caches.open('escape-room-'+version);return(await c.keys()).length;},sourceCacheVersion);
     assert.ok(cached>=150);
     await installed.setOffline(true);await app.reload();await app.waitForFunction(()=>typeof updateAdventureStatus==='function');
+    await app.evaluate(()=>{tabletopEnabled=false;});
     await app.evaluate(()=>{startDeck('story');pendingSeed=100;performDeal();});
     const offlineCards=await app.locator('.card').count();assert.ok(offlineCards>=54 && offlineCards<=72);
     await installed.setOffline(false);

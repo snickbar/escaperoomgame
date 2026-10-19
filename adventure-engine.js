@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.5.1';
+const GAME_VERSION = '0.6.0';
 const GAME_SCHEMA = 'ER2';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
@@ -100,6 +100,7 @@ function exhaustedCardNumbers(cards, flipped, mode) {
 }
 
 function refreshCardExhaustion() {
+  if (typeof tabletopActive === 'function' && tabletopActive()) { syncTabletop(); return; }
   const cards = [...tableEl.querySelectorAll('.card')];
   const flipped = new Set(cards.filter(card => card.classList.contains('flipped'))
     .map(card => Number(card.dataset.number)));
