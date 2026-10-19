@@ -29,14 +29,33 @@ document.body.insertAdjacentHTML('beforeend', `
     <button class="dialog-close" type="button" aria-label="Close item picker">×</button>
     <span class="eyebrow">Make a connection</span><h2 id="combineTitle">Use this with…</h2>
     <p id="combineDescription"></p><div id="combineOptions"></div>
+  </dialog>
+  <dialog class="paper-dialog success-dialog" id="successDialog" aria-labelledby="successTitle">
+    <button class="dialog-close" type="button" aria-label="Close and take your cards">×</button>
+    <div class="success-badge" aria-hidden="true">✓</div>
+    <span class="eyebrow" id="successEyebrow">Puzzle solved</span><h2 id="successTitle"></h2>
+    <p id="successHow"></p><p class="success-story" id="successStory"></p>
+    <button class="primary-action" type="button" id="successTake">Take cards</button>
+  </dialog>
+  <dialog class="paper-dialog settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+    <button class="dialog-close" type="button" aria-label="Close settings">×</button>
+    <span class="eyebrow">Settings</span><h2 id="settingsTitle">Your adventure</h2>
+    <div id="settingsStatus"></div>
+    <div class="settings-actions">
+      <button class="settings-row" type="button" id="settingsSound"></button>
+      <button class="settings-row" type="button" id="settingsTesting">Testing tools</button>
+    </div>
+    <p class="settings-version" id="settingsVersion"></p>
   </dialog>`);
 const codeDialog = document.getElementById('codeDialog');
 const discardDialog = document.getElementById('discardDialog');
 const combineDialog = document.getElementById('combineDialog');
+const successDialog = document.getElementById('successDialog');
+const settingsDialog = document.getElementById('settingsDialog');
 const codeFeedback = document.getElementById('codeFeedback');
 const tabletopZoomCode=document.createElement('button');
 tabletopZoomCode.className='primary-action';tabletopZoomCode.type='button';tabletopZoomCode.textContent='Take cards';tabletopZoomCode.hidden=true;
-tabletopZoomCode.onclick=()=>{if(currentPuzzleContext?.content.visualClue)openCodeEntry();else closeZoom();};zoomCardEl.appendChild(tabletopZoomCode);
+tabletopZoomCode.onclick=()=>{if(currentPuzzleContext?.content.visualClue)openCodeEntry('picture');else closeZoom();};zoomCardEl.appendChild(tabletopZoomCode);
 function tabletopRewardNumbers(context) {
   if(!tabletopActive()||!tabletopState||runEnded||winPending||!context||context.num===null||
     cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||context.content.visualClue||
@@ -72,7 +91,61 @@ function configureTabletopZoom() {
     else if(!context.content.puzzle&&context.content.unlocks?.some(n=>!flippedNumbers.has(n)))zoomHintEl.textContent='Keep this discovery. Finish the remaining leads, then return here for the ending.';
   }
 }
-for (const dialog of [codeDialog, discardDialog, combineDialog]) {
+// A solved puzzle closes into its own celebration. Its rewards are taken by
+// the button or by dismissing the pop-up, just as closing a card collects them.
+const SUCCESS_LINES={
+  cryptogram:['Message decoded!','Every letter is in place, and the hidden message reads clearly.'],
+  cipher:['Message decoded!','Every letter is in place, and the hidden message reads clearly.'],
+  swap:['Picture restored!','Every fragment is back where it belongs.'],
+  slider:['Picture restored!','Every tile is back where it belongs.'],
+  water:['The water flows!','You connected the pipes all the way from the tap to the tank.'],
+  electric:['Power restored!','Current runs through every glass tube to the lamp.'],
+  shapes:['Document restored!','You fitted every torn fragment back into place.'],
+  deduction:['Well reasoned!',''],
+};
+const SUCCESS_STORY={
+  lucy:['Lucy grins. “Hold on, Pip, we’re coming!”','Somewhere nearby, a small bark answers.','Lucy tucks the clue into her pocket and points the way.','Fresh pawprints lead on toward the next clue.'],
+  lighthouse:['Out past the reef, Mara’s boat is still holding its course.','The wind rattles the tower windows. There is still time.','You note it in the keeper’s ledger and press on.','Far below, the waves crash against the rocks.'],
+  library:['Somewhere in the stacks, the archive clock ticks on.','Ada’s trail is growing clearer.','You slip the evidence into your notebook.','Midnight is getting closer.'],
+};
+let successOnClose=null;
+function successStoryLine(num) {
+  const lines=SUCCESS_STORY[activeStory.id]||SUCCESS_STORY.lighthouse;
+  return lines[num%lines.length];
+}
+function openSuccess({eyebrow,title,how,story,action,onClose}) {
+  [codeDialog,discardDialog,combineDialog].forEach(d=>{if(d.open)d.close();});
+  document.getElementById('successEyebrow').textContent=eyebrow;
+  document.getElementById('successTitle').textContent=title;
+  document.getElementById('successHow').textContent=how;
+  document.getElementById('successStory').textContent=story;
+  document.getElementById('successTake').textContent=action;
+  successOnClose=onClose;
+  successDialog.showModal();document.getElementById('successTake').focus();
+}
+function finishSuccess() {const done=successOnClose;successOnClose=null;done?.();}
+// The close event arrives a moment later; the button hands over cards at once.
+successDialog.addEventListener('close',finishSuccess);
+document.getElementById('successTake').onclick=()=>{finishSuccess();successDialog.close();};
+function showPuzzleSuccess(content,num) {
+  const context={content,num};
+  if(currentPuzzleContext?.content!==content)return;
+  const rewards=tabletopRewardNumbers(context);
+  if(!rewards.length)return;
+  const p=content.puzzle;
+  const [title,how]=SUCCESS_LINES[p.type==='pipes'?(p.pipeStyle==='electric'?'electric':'water'):p.type]||['Puzzle solved!','You worked it out.'];
+  // Leave the puzzle without collecting: the pop-up hands over the cards.
+  tabletopZoomCode.hidden=true;currentPuzzleContext=null;
+  if(puzzleCleanup){puzzleCleanup();puzzleCleanup=null;}
+  zoomOverlay.classList.remove('open');
+  openSuccess({eyebrow:'Puzzle solved',title,
+    how:p.type==='deduction'?'Every note fits: the '+p.items[p.sought]+' is '+(p.prep||'in')+' '+p.places[p.solutionIndex]+'.':how,
+    story:successStoryLine(num),
+    action:'Take '+(rewards.length===1?'card ':'cards ')+rewards.join(' and '),
+    onClose:()=>collectTabletopRewards(context)});
+}
+
+for (const dialog of [codeDialog, discardDialog, combineDialog, successDialog, settingsDialog]) {
   dialog.querySelector('.dialog-close').onclick = () => dialog.close();
   dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 }
@@ -87,7 +160,49 @@ gameScreenEl.querySelector('.scene').before(tabletopToolbar);
 const tableHeading = document.createElement('div'); tableHeading.className='table-heading'; tableHeading.hidden=true;
 tableHeading.innerHTML='<div><span class="eyebrow">Follow your curiosity</span><h2>Your table</h2></div><p id="tableHelp">Tap to inspect · drag items together to combine</p>';
 tableEl.before(tableHeading);
-document.getElementById('openCode').onclick = openCodeEntry;
+// One anchored bar: home, lives and hint on the left, settings on the right.
+// Slots leave room for more buttons later.
+const storyTopbar=document.createElement('header');
+storyTopbar.className='story-topbar';storyTopbar.hidden=true;
+storyTopbar.innerHTML=`<div class="topbar-row">
+    <div class="topbar-slot" id="topbarHome"></div><div class="topbar-slot" id="topbarLives"></div><div class="topbar-slot" id="topbarHint"></div>
+    <span class="topbar-spacer"></span>
+    <button class="topbar-button" type="button" id="openSettings" aria-label="Settings" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+  </div><div class="topbar-progress" aria-hidden="true"><span id="topbarProgress"></span></div>`;
+gameScreenEl.prepend(storyTopbar);
+const homeLinkHTML=homeLinkEl.innerHTML;
+const adventureStatusEl=document.getElementById('adventureStatus');
+function mountStoryTopbar() {
+  document.getElementById('topbarHome').appendChild(homeLinkEl);
+  document.getElementById('topbarLives').appendChild(livesDisplayEl);
+  document.getElementById('topbarHint').appendChild(tableHintBtnEl);
+  homeLinkEl.innerHTML='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3Z"/></svg><span>Home</span>';
+  document.getElementById('settingsStatus').appendChild(adventureStatusEl);
+  storyTopbar.hidden=false;
+}
+function unmountStoryTopbar() {
+  storyTopbar.hidden=true;
+  debugNextBtnEl.before(homeLinkEl,tableHintBtnEl);
+  homeLinkEl.innerHTML=homeLinkHTML;
+  gameTitleEl.after(adventureStatusEl);adventureStatusEl.after(livesDisplayEl);
+}
+function updateSettingsSound() {
+  document.getElementById('settingsSound').textContent=(soundEnabled?'🔊 Sound: on':'🔇 Sound: off');
+}
+document.getElementById('openSettings').onclick=()=>{
+  document.getElementById('settingsTitle').textContent=activeStory.title;
+  document.getElementById('settingsVersion').textContent='Version '+GAME_VERSION;
+  updateSettingsSound();settingsDialog.showModal();
+};
+document.getElementById('settingsSound').onclick=()=>{document.getElementById('soundToggle').click();updateSettingsSound();};
+document.getElementById('settingsTesting').onclick=()=>{
+  settingsDialog.close();
+  const panel=document.getElementById('testingPanel');
+  if(panel.hidden)document.getElementById('testingToggle').click();
+  else panel.scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+document.getElementById('openCode').onclick = ()=>openCodeEntry();
 document.getElementById('openDiscards').onclick = openDiscardPile;
 tableHintBtnEl.addEventListener('click', event=>{
   if(!tabletopActive())return;
@@ -129,7 +244,9 @@ function resetTabletopUI() {
   document.body.classList.remove('tabletop-story');
   tabletopZoomCode.hidden=true;
   tabletopToolbar.hidden=true;tableHeading.hidden=true;
-  [codeDialog,discardDialog,combineDialog].forEach(d=>{if(d.open)d.close();});
+  successOnClose=null;
+  [codeDialog,discardDialog,combineDialog,successDialog,settingsDialog].forEach(d=>{if(d.open)d.close();});
+  unmountStoryTopbar();
 }
 
 function dealTabletop() {
@@ -138,10 +255,12 @@ function dealTabletop() {
   mistakes=0;lives=MAX_LIVES;renderLives();startTime=Date.now();
   buildStoryCardContent(randomInt(STORY_MODE_TABLE_SIZE_MIN,STORY_MODE_TABLE_SIZE_MAX));
   // Geometry clues belong to the old fixed grid. A changing table uses codes.
-  cardContent.forEach(content=>{
+  const finaleParts=new Set([...cardContent.values()].filter(c=>c.isFinale).flatMap(c=>c.requires));
+  cardContent.forEach((content,number)=>{
     if(!content.isProgress)return;
     content.hint=content.unlocks.length ? describeUnlocks(content.unlocks)
-      : content.backItem ? 'Drag this onto a related item to see what you can make.' : content.hint;
+      : finaleParts.has(number) ? 'Keep this for the finale. It completes the story once every other lead is finished.'
+      : content.kind==='object' ? 'Drag this onto a related item to see what you can make.' : content.hint;
   });
   const root=[...cardContent].find(([,c])=>c.isSeed);
   root[1].unlocks.forEach(n=>flippedNumbers.add(n));
@@ -149,6 +268,7 @@ function dealTabletop() {
   tabletopState={active:new Set(flippedNumbers),discarded:new Set(),inspected:new Set(),lastDraw:[],selected:null};
   deckEl.dataset.empty='true';deckWrapEl.style.display='none';
   document.body.classList.add('tabletop-story');tabletopToolbar.hidden=false;tableHeading.hidden=false;
+  mountStoryTopbar();
   refreshStoryUnlocks();syncTabletop();
 }
 
@@ -162,6 +282,7 @@ function renderTabletopStatus() {
   status.innerHTML=`<div class="chapter-progress"><span>Chapter ${Math.min(complete+1,10)} of 10</span><span>${complete} discoveries made</span><progress value="${complete}" max="10" aria-label="Adventure progress"></progress></div>
     <details class="adventure-journal"><summary>Read your story so far</summary><ol></ol></details>`;
   status.querySelector('details').open=!!journalOpen;
+  document.getElementById('topbarProgress').style.width=(complete*10)+'%';
   const entries=status.querySelector('ol');
   [...cardContent].filter(([n,c])=>flippedNumbers.has(n)&&(c.isSeed||c.requires)).sort((a,b)=>a[1].chapter-b[1].chapter).forEach(([,c])=>{
     const li=document.createElement('li');li.textContent=c.message;entries.appendChild(li);
@@ -241,7 +362,7 @@ function drawTabletopCard(number,via,source) {
   const c=cardContent.get(number);if(!c)return false;
   if(via==='code'&&!validCodeTargets().has(number))return false;
   if(via==='reward'&&!tabletopRewardNumbers(source).includes(number))return false;
-  if(via==='combine'&&(!c.requires||!c.requires.every(n=>tabletopState.active.has(n))))return false;
+  if(via==='combine'&&(!c.requires||!c.requires.every(n=>tabletopState.active.has(n))||c.isFinale&&!unlockedNumbers.has(number)))return false;
   flippedNumbers.add(number);tabletopState.lastDraw=[number];
   refreshStoryUnlocks();syncTabletop();playCorrectSound();
   const drawn=tableEl.querySelector('[data-number="'+number+'"]');if(drawn)drawn.classList.add('just-drawn');
@@ -255,10 +376,16 @@ function recordTabletopError(card,reason) {
   loseLife();
 }
 
-function openCodeEntry() {
+let codeEntrySource=null;
+function openCodeEntry(source) {
   if(!tabletopState||runEnded||winPending)return;
+  const picture=source==='picture'?currentPuzzleContext:null;
   closeZoom();
   if(runEnded||winPending)return;
+  codeEntrySource=picture;
+  codeDialog.querySelector('.eyebrow').textContent=picture?'Sharp eyes':'A new discovery';
+  document.getElementById('codeTitle').textContent=picture?'What number did you find?':'What did you find?';
+  codeDialog.querySelector('form>p').textContent=picture?'Type the number hidden in the picture to draw the card it points to.':'Enter a card number from a clue or a solved puzzle to draw it from the deck.';
   document.getElementById('discoveryCode').value='';
   codeFeedback.textContent='An incorrect code costs one life.';codeFeedback.className='';
   codeDialog.showModal();document.getElementById('discoveryCode').focus();
@@ -269,7 +396,12 @@ document.getElementById('codeForm').onsubmit=event=>{
   if(!/^\d{1,3}$/.test(text)){codeFeedback.textContent='Enter a number from 0 to 199.';return;}
   const number=Number(text);
   if(flippedNumbers.has(number)){codeFeedback.textContent='You already found this card. Check your table or discards.';return;}
-  if(drawTabletopCard(number,'code')){codeDialog.close();showToast('A new card joins your table.');}
+  if(drawTabletopCard(number,'code')){
+    const source=codeEntrySource;codeDialog.close();
+    if(source?.content.visualClue?.answer===number)openSuccess({eyebrow:'Hidden number found',title:'You found it!',
+      how:'Card '+number+' was hidden in the picture. It is now on your table.',story:successStoryLine(number),action:'Continue',onClose:null});
+    else showToast('A new card joins your table.');
+  }
   else {
     if(lives===1)codeDialog.close();
     recordTabletopError(number,'Incorrect or premature code');
@@ -283,6 +415,8 @@ function combineTabletopCards(first,second) {
   if(![first,second].every(n=>tabletopState.active.has(n)&&isCombinableItem(n)))return false;
   const result=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.length===2&&c.requires.includes(first)&&c.requires.includes(second));
   if(!result){recordTabletopError(first+' + '+second,'Items do not combine');return false;}
+  // The right pair, but too early: no penalty, just a nudge.
+  if(result[1].isFinale&&!unlockedNumbers.has(result[0])){showToast('These belong together, but save them for the finale. Finish your other leads first.',4000);return false;}
   if(!drawTabletopCard(result[0],'combine'))return false;
   showToast('You made '+result[1].backItem.name+'!');
   openZoom(result[0]);return true;

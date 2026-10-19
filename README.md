@@ -3,7 +3,24 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.8.0 — several leads to follow
+## Current release: 0.9.0 — a calmer table and fresh puzzle art
+
+- Story Mode has one anchored top bar: **Home**, lives and **Hint** on the left,
+  **Settings** on the right (story progress, journal, sound, testing tools).
+  The slots leave room for more buttons.
+- Every solved story puzzle closes into its own success pop-up: what you did,
+  a line of story, and a **Take cards** button. Dismissing it also takes them.
+  Hidden-number pictures open a code box and celebrate a correct number.
+- Every crafted result now leads somewhere; none is a dead end in Discards.
+  The last combination waits until every other lead is finished, so the
+  finale really comes last. Trying it early costs no life.
+- Logic puzzles use four places, three settings per story (never repeated in one
+  run) and more kinds of notes: next to, not next to, somewhere left of, at an
+  end, and between.
+- New medium-detail artwork: four Picture Puzzle scenes and four Shapes
+  documents per story, plus four hidden-number scenes per story.
+  Regenerate with `node scripts/make-puzzle-pictures.cjs`.
+
 
 Story selection uses visible illustrated buttons. Product UI should not use dropdown menus.
 Puzzle workspaces use most of the phone screen and adapt to orientation changes.
@@ -49,7 +66,7 @@ active cards in the verified playthroughs. Early items may find partners later.
 
 Each story has ten combinations, eight existing puzzles, two logic deductions,
 two hidden-number picture clues, two story interludes, an opening and an ending. All 46 progression cards must be discovered. Cryptogram,
-Picture Puzzle, Shapes and Pipes each appear twice. Logic: Three Places adds
+Picture Puzzle, Shapes and Pipes each appear twice. Logic: Four Places adds
 uniquely solvable witness-note deductions, with two hints. Checking a wrong
 deduction costs a life in Story Mode; workshop practice has no penalty.
 
@@ -145,9 +162,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.8.0.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.9.0.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.8.0/EscapeRoom-0.8.0.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.9.0/EscapeRoom-0.9.0.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

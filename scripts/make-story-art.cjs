@@ -106,5 +106,5 @@ for (const story of ctx.book) {
     : '<path d="M0 167q55-35 110-10t110-12v105H0Z" fill="#304d45"/><path d="M0 210q80-65 220-25" fill="none" stroke="#739883" stroke-width="15"/><g fill="#bd9672" stroke="#ead0a6" stroke-width="3"><ellipse cx="109" cy="135" rx="41" ry="30"/><circle cx="142" cy="111" r="24"/><path d="m125 94-10 26 21-10m-64 22-24-23m38 44v28m41-28v28"/></g><circle cx="150" cy="106" r="3" fill="#17232f"/><path d="m128 128 26-9" stroke="#79d4e7" stroke-width="7"/>';
   fs.writeFileSync(`art/story/${story.id}-cover.svg`, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 250"><title>${esc(story.title)}</title><rect width="220" height="250" rx="22" fill="#17232f"/><circle cx="176" cy="39" r="17" fill="#f7d688" opacity=".7"/>${scene}</svg>`);
 }
-fs.writeFileSync('story-assets.json',JSON.stringify(fs.readdirSync('art/story').filter(f=>f.endsWith('.svg')).map(f=>'./art/story/'+f),null,2)+'\n');
+fs.writeFileSync('story-assets.json',JSON.stringify(['story','puzzles'].flatMap(dir=>fs.existsSync('art/'+dir)?fs.readdirSync('art/'+dir).filter(f=>f.endsWith('.svg')).map(f=>'./art/'+dir+'/'+f):[]),null,2)+'\n');
 console.log('Created 90 item illustrations, 3 story covers, and the offline artwork list.');

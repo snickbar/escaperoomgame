@@ -96,7 +96,7 @@
 .deduction-evidence { display:grid; gap:12px; padding-left:25px; text-align:left; font:16px/1.6 system-ui,sans-serif; }
 .deduction-evidence li { padding:10px; background:#fffdf6; border-left:3px solid #b39a65; border-radius:4px; }
 .deduction-area p { font:14px/1.5 system-ui; }
-.deduction-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:18px 0; }
+.deduction-choices { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:18px 0; }
 .deduction-choices button { padding:16px 8px; background:#fffdf4; color:#32594f; font:15px/1.4 system-ui; border:1px solid #bcb798; border-radius:8px; min-height:60px; cursor:pointer; }
 .deduction-choices button[aria-pressed=true] { background:#31584f; color:#fffdf4; border-color:#31584f; }
 .deduction-choices button:disabled { opacity:.4; cursor:default; }
@@ -107,4 +107,6 @@
 .has-picture-clue .zoom-item-art svg { width:100%; display:block; }
 .has-picture-clue .zoom-message { font-size:18px; padding:0 22px; }
 .has-picture-clue .primary-action { width:100%; margin-top:14px; justify-content:center; }
+.deduction-choices button small { display:block; margin:0; font-size:11px; color:inherit; opacity:.75; text-transform:capitalize; }
+.deduction-choices button strong { display:block; font:26px/1.1 Georgia,serif; }
 @media(max-width:400px){ .deduction-area { padding:12px; } .deduction-evidence { font-size:14px; } .deduction-choices button { font-size:13px; padding:12px 5px; } }

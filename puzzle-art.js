@@ -7,7 +7,14 @@ function configurePuzzleArt(content){
   zoomPuzzleEl.style.setProperty("--puzzle-board-width",Math.min(boardWidth,innerHeight*.64)+"px");
   pipesGridEl.style.setProperty("--pipe-cell",Math.floor((Math.min(boardWidth,innerHeight*.64)-44)/4)+"px");
   requestAnimationFrame(()=>{zoomCardEl.scrollTop=0;});
-  p.artwork ||= p.type==='shapes'?'art/scenes/'+theme+'-document.svg':p.type==='swap'&&content.chapter>=5?'art/story/'+theme+'-'+content.chapter+'-c.svg':'art/scenes/'+theme+'.png';
+  if(!p.artwork&&(p.type==='shapes'||p.type==='swap')){
+    // Four pictures per story; puzzles of one type in a run take different ones.
+    const same=[...cardContent.values()].filter(c=>c.puzzle?.type===p.type);
+    const rank=same.indexOf(content);
+    const index=rank<0?Math.floor(Math.random()*4):((runSeed>>>5)+rank)%4;
+    p.artwork='art/puzzles/'+theme+'-'+(p.type==='shapes'?'document':'picture')+'-'+index+'.svg';
+  }
+  p.artwork ||= 'art/scenes/'+theme+'.png';
   if(p.type==='pipes')p.pipeStyle ||= theme==='library'?'electric':'water';
   zoomPuzzleEl.dataset.puzzle=p.type;
   pipesGridEl.dataset.style=p.pipeStyle||'water';

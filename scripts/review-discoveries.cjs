@@ -12,16 +12,17 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
    let count=0;const clueCounts=new Set();
    for(const theme of Object.keys(DEDUCTION_THEMES))for(let seed=0;seed<500;seed++){
     const p=withGameSeed(seed,()=>makeDeductionPuzzle(0,theme));
-    const possible=THREE_ORDERS.filter(order=>p.clues.every(c=>deductionMatches(order,c)));
+    if(p.places.length!==4)throw Error('Expected four places');
+    const possible=DEDUCTION_ORDERS.filter(order=>p.clues.every(c=>deductionMatches(order,c)));
     if(possible.length!==1||possible[0].indexOf(p.sought)!==p.solutionIndex)throw Error('Ambiguous logic');
-    if(p.clues.length<2||!p.clues.some(c=>c.kind!=='not'))throw Error('No real deduction needed');
+    if(p.clues.length<2||p.clues.filter(c=>c.kind!=='not'&&c.kind!=='end').length<2)throw Error('No real deduction needed');
     clueCounts.add(p.clues.length);count++;
    }
    return {count,clueCounts:[...clueCounts]};
   });assert.equal(logic.count,1500);
   await page.evaluate(()=>openTestPuzzle('deduction'));
   await page.waitForFunction(()=>getComputedStyle(zoomOverlay).opacity==='1');await page.screenshot({path:path.join(out,'discovery-logic.png')});
-  const wrong=await page.evaluate(()=>[0,1,2].find(i=>i!==currentPuzzleContext.content.puzzle.solutionIndex));
+  const wrong=await page.evaluate(()=>[0,1,2,3].find(i=>i!==currentPuzzleContext.content.puzzle.solutionIndex));
   await page.locator('.deduction-choices button').nth(wrong).click();await page.getByRole('button',{name:'Check deduction',exact:true}).click();
   assert.equal(await page.evaluate(()=>currentPuzzleContext.content.puzzle.solved),false);
   const answer=await page.evaluate(()=>currentPuzzleContext.content.puzzle.solutionIndex);
@@ -58,22 +59,27 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
   const bad=await page.evaluate(()=>Array.from({length:200},(_,i)=>i).find(n=>!flippedNumbers.has(n)&&!validCodeTargets().has(n)));
   await page.fill('#discoveryCode',String(bad));await page.locator('#codeForm button[type=submit]').click();assert.equal(await page.evaluate(()=>lives),livesBefore-1);
   await page.fill('#discoveryCode',String(image.answer));await page.locator('#codeForm button[type=submit]').click();
-  assert.equal(await page.evaluate(n=>flippedNumbers.has(n),image.answer),true);assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),image.num),true);
+  assert.equal(await page.evaluate(n=>flippedNumbers.has(n),image.answer),true);assert.equal(await page.evaluate(()=>document.getElementById('successDialog').open),true);assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),image.num),true);
   const storyLogic=await page.evaluate(()=>{
    startDeck('story');pendingSeed=99;performDeal();
    const story=[...tabletopState.active].find(n=>cardContent.get(n).kind==='story');openZoom(story);closeZoom();
    const n=[...tabletopState.active].find(n=>cardContent.get(n).puzzle?.type==='deduction');openZoom(n);
    const c=cardContent.get(n);return {num:n,answer:c.puzzle.solutionIndex,rewards:c.unlocks};
   });
-  await page.locator('.deduction-choices button').nth((storyLogic.answer+1)%3).click();await page.getByRole('button',{name:'Check deduction',exact:true}).click();
+  await page.locator('.deduction-choices button').nth((storyLogic.answer+1)%4).click();await page.getByRole('button',{name:'Check deduction',exact:true}).click();
   assert.equal(await page.evaluate(()=>lives),2);
   await page.locator('#zoomClose').click();assert.equal(await page.evaluate(ids=>ids.some(n=>flippedNumbers.has(n)),storyLogic.rewards),false);
   await page.evaluate(n=>openZoom(n),storyLogic.num);await page.locator('.deduction-choices button').nth(storyLogic.answer).click();await page.getByRole('button',{name:'Check deduction',exact:true}).click();
-  await page.getByRole('button',{name:'Take cards '+storyLogic.rewards.join(' and '),exact:true}).click();
+  // A solved puzzle closes into its own success pop-up, which hands over the cards.
+  await page.waitForFunction(()=>document.getElementById('successDialog').open);
+  assert.equal(await page.evaluate(()=>zoomOverlay.classList.contains('open')),false);
+  assert.equal(await page.evaluate(ids=>ids.some(n=>flippedNumbers.has(n)),storyLogic.rewards),false);
+  await page.screenshot({path:path.join(out,'discovery-success.png')});
+  await page.locator('#successDialog').getByRole('button',{name:'Take cards '+storyLogic.rewards.join(' and '),exact:true}).click();
   assert.equal(await page.evaluate(ids=>ids.every(n=>flippedNumbers.has(n)),storyLogic.rewards),true);assert.equal(await page.evaluate(()=>lives),2);
   assert.equal(await page.evaluate(()=>{
-   for(const theme of Object.keys(DEDUCTION_THEMES))for(let variant=0;variant<2;variant++)for(let answer=0;answer<200;answer++){
-    const parsed=new DOMParser().parseFromString(hiddenPictureArtwork({theme,variant,answer}),'image/svg+xml');
+   for(const theme of Object.keys(DEDUCTION_THEMES))for(let scene=0;scene<4;scene++)for(let answer=0;answer<200;answer++){
+    const parsed=new DOMParser().parseFromString(hiddenPictureArtwork({theme,scene,answer}),'image/svg+xml');
     if(parsed.querySelector('parsererror'))return false;
    }
    return true;
@@ -85,6 +91,10 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
     storyChoiceEl.value=book.id;startDeck('story');pendingSeed=seed;performDeal();assistedRun=true;
     const pictures=[...cardContent.values()].filter(c=>c.visualClue);if(pictures.length!==2)throw Error('Picture frequency');picCounts.add(pictures.length);
     if([...cardContent.values()].filter(c=>c.puzzle?.type==='deduction').length!==2)throw Error('Logic missing');
+    // No crafted result is a dead end: each one unlocks a card or is used again.
+    if([...cardContent].some(([n,c])=>c.requires&&!c.unlocks.length&&![...cardContent.values()].some(o=>o.requires?.includes(n))))throw Error('Dead-end combination');
+    const logicSettings=[...cardContent.values()].filter(c=>c.puzzle?.type==='deduction').map(c=>c.puzzle.scene);if(logicSettings[0]===logicSettings[1])throw Error('Repeated logic setting');
+    const scenes=pictures.map(c=>c.visualClue.scene);if(scenes[0]===scenes[1])throw Error('Repeated hidden picture');
     for(let step=0;step<160&&!winPending;step++){
      maxActive=Math.max(maxActive,tabletopState.active.size);
      const actions=[];
@@ -92,6 +102,9 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
      for(const [n,c] of cardContent)if(!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)))actions.push(()=>{combineTabletopCards(...c.requires);closeZoom();});
      if(!actions.length)throw Error('Branch deadlock '+book.id+' '+seed);
      actions[(step*7+seed)%actions.length]();
+     // The finale combination only appears once every other lead is complete.
+     const finale=[...cardContent].find(([,c])=>c.isFinale);
+     if(flippedNumbers.has(finale[0])&&[...cardContent].some(([n,c])=>c.isProgress&&!c.isWin&&!c.isFinale&&(!flippedNumbers.has(n)||c.puzzle&&!c.puzzle.solved)))throw Error('Finale before the other leads');
     }
     if(!winPending||[...cardContent].some(([n,c])=>c.isProgress&&!flippedNumbers.has(n)))throw Error('Unfinished branch');games++;
    }
