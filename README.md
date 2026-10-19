@@ -3,7 +3,7 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.7.1 — larger, friendlier puzzles
+## Current release: 0.7.2 — larger, friendlier puzzles
 
 Story selection uses visible illustrated buttons. Product UI should not use dropdown menus.
 Puzzle workspaces use most of the phone screen and adapt to orientation changes.
@@ -13,13 +13,13 @@ Android APKs are signed release builds; “Test Mode” means the mini-game work
   through glass tubes. Both are in the mini-game workshop and each story includes
   one of each. Source and destination stay fixed; only a connected path carries flow.
 - **Picture Puzzle** replaces visible numbers with fragments of story artwork.
-  A simpler 3×3 board uses nine fragments. Tap two to swap; a reference is available.
+  The larger 4×4 board uses sixteen fragments. Tap two to swap; a reference is available.
 - **Shapes** restores an illustrated document for the selected story. Fragments
   can be tried anywhere they fit; finish by lining up the document. Hints recover
   a correct layout even after experimental placements. Pieces vary in size and
   count, with at most two of any silhouette (including rotated/reflected copies).
   Board sizes still vary from 20 to 30 cells, with two safe hints.
-- **Cryptogram** uses notebook paper and animated pencil lettering. Matching
+- **Cryptogram** uses notebook paper with clear printed letters and a reveal animation. Matching
   letters still fill together. Correct letters cannot be erased or overwritten;
   mistakes remain editable. Motion respects the device's reduced-motion setting.
 
@@ -32,9 +32,10 @@ Garden**, then **Begin adventure**. The opening goes into your discoveries;
 just two leads start on the table. Typical play holds two or three active
 cards instead of a full spread.
 
-- Inspect cards to read clues and play puzzles. Story rewards have a **Take cards**
+- Inspect cards to read clues and play puzzles. Story and solved-puzzle rewards have a **Take cards**
   button and are also collected when you close the card. Table previews hide
-  next-card instructions. **Enter code** draws answers found in completed puzzles.
+  next-card instructions. **Enter code** remains an optional way to draw a known code;
+  taking rewards never requires typing it.
   Wrong or premature codes cost a life; repeated discoveries do not.
 - **Drag one item onto another** to combine them. Matching items draw their
   result directly; no addition or sum-code entry is needed. **Combine…**
@@ -135,9 +136,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.7.1.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.7.2.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.7.1/EscapeRoom-0.7.1.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.7.2/EscapeRoom-0.7.2.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

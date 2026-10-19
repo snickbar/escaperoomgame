@@ -1943,7 +1943,7 @@
   // swap with any other here, and the grid is a size bigger to compensate
   // for how much easier that makes it: 4x4 numbered 1-16, no blank.)
 
-  const SWAP_SIZE = 3;
+  const SWAP_SIZE = 4;
 
   function makeSwapPuzzle(target) {
     const solved = Array.from({ length: SWAP_SIZE * SWAP_SIZE }, (_, i) => i + 1);
@@ -2903,7 +2903,7 @@
     return assignAdventureItems(nodes);
   }  function describeUnlocks(nums) {
     if (!nums || nums.length === 0) return '';
-    if (typeof tabletopActive === 'function' && tabletopActive()) return 'Enter ' + (nums.length === 1 ? 'code ' : 'codes ') + nums.join(' and ') + ' to draw ' + (nums.length === 1 ? 'a new card.' : 'new cards.');
+    if (typeof tabletopActive === 'function' && tabletopActive()) return 'Take ' + (nums.length === 1 ? 'card ' : 'cards ') + nums.join(' and ') + '.';
     if (nums.length === 1) return 'Flip over card ' + nums[0] + '!';
     if (nums.length === 2) return 'Flip over cards ' + nums.join(' and ') + '!';
     // 3+ (an area hub whose shape didn't fit, falling back to named

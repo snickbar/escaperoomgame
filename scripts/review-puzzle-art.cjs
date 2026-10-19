@@ -32,7 +32,7 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
   assert.equal((await page.evaluate(rotateToSolution)).solved,true);
   await page.evaluate(()=>openTestPuzzle('swap'));
   assert.equal(await page.locator('.swap-tile').first().textContent(),'');
-  assert.equal(await page.locator('.swap-tile').count(),9);
+  assert.equal(await page.locator('.swap-tile').count(),16);
   assert.equal(await page.locator('.tube-collar').count(),0);
   await page.getByRole('button',{name:'View reference',exact:true}).click();await page.locator('#puzzleReference').evaluate(e=>e.decode());
   await page.screenshot({path:path.join(out,'art-picture-reference.png')});
@@ -42,6 +42,8 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
   await page.evaluate(()=>openTestPuzzle('cryptogram'));
   await page.evaluate(()=>{const p=currentPuzzleContext.content.puzzle;[...cipherKeyboardEl.children].find(e=>e.textContent===p.plaintext[0]).click();});
   assert.ok(await page.locator('.pencil-mark').count()>0);
+  assert.equal(await page.locator('.cipher-blank').first().evaluate(e=>getComputedStyle(e).fontStyle),'normal');
+  assert.ok(await page.locator('.cipher-blank').first().evaluate(e=>!getComputedStyle(e).fontFamily.includes('cursive')));
   const protectedLetters=await page.evaluate(()=>{
     const p=currentPuzzleContext.content.puzzle;
     const locked=p.guesses.map((g,i)=>g&&g===p.plaintext[i]?i:null).filter(i=>i!==null);

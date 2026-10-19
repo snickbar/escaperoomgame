@@ -35,14 +35,12 @@ const discardDialog = document.getElementById('discardDialog');
 const combineDialog = document.getElementById('combineDialog');
 const codeFeedback = document.getElementById('codeFeedback');
 const tabletopZoomCode=document.createElement('button');
-tabletopZoomCode.className='primary-action';tabletopZoomCode.type='button';tabletopZoomCode.textContent='Enter clue code ↗';tabletopZoomCode.hidden=true;
-tabletopZoomCode.onclick=()=>{
-  if(currentPuzzleContext&&!currentPuzzleContext.content.puzzle)closeZoom();
-  else openCodeEntry();
-};zoomCardEl.appendChild(tabletopZoomCode);
+tabletopZoomCode.className='primary-action';tabletopZoomCode.type='button';tabletopZoomCode.textContent='Take cards';tabletopZoomCode.hidden=true;
+tabletopZoomCode.onclick=closeZoom;zoomCardEl.appendChild(tabletopZoomCode);
 function tabletopRewardNumbers(context) {
   if(!tabletopActive()||!tabletopState||runEnded||winPending||!context||context.num===null||
-    cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||context.content.puzzle)return [];
+    cardContent.get(context.num)!==context.content||!flippedNumbers.has(context.num)||
+    (context.content.puzzle&&!context.content.puzzle.solved))return [];
   return (context.content.unlocks||[]).filter(n=>!flippedNumbers.has(n)&&unlockedNumbers.has(n));
 }
 function collectTabletopRewards(context) {
@@ -58,8 +56,8 @@ function configureTabletopZoom() {
   const rewards=tabletopRewardNumbers(context);
   tabletopZoomCode.textContent=rewards.length
     ? 'Take '+(rewards.length===1?'card ':'cards ')+rewards.join(' and ')
-    : 'Enter clue code ↗';
-  if(tabletopActive()&&tabletopState&&context&&!context.content.puzzle){
+    : 'Take cards';
+  if(tabletopActive()&&tabletopState&&context){
     tabletopZoomCode.hidden=!rewards.length;
     if(rewards.length)zoomHintEl.textContent='Take these cards to follow your next lead.';
   }
@@ -86,7 +84,7 @@ tableHintBtnEl.addEventListener('click', event=>{
   event.stopImmediatePropagation();
   if(!tabletopState||runEnded)return;
   const puzzle=[...tabletopState.active].find(n=>cardContent.get(n).puzzle&&!cardContent.get(n).puzzle.solved);
-  showToast(puzzle!==undefined?'Open the puzzle card. Its hint can help you find the next code.':validCodeTargets().size?'Read your clue, then use Enter code to draw the card it points to.':'Try dragging two related items together. Their pictures are your clue.',3500);
+  showToast(puzzle!==undefined?'Open the puzzle card and solve it to receive your next cards.':validCodeTargets().size?'Open your clue and take the cards it reveals.':'Try dragging two related items together. Their pictures are your clue.',3500);
 },{capture:true});
 
 function renderTabletopHome() {

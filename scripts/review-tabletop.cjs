@@ -43,8 +43,11 @@ const server=http.createServer((req,res)=>{
     const enter=async number=>{
       await page.locator('#openCode').click();await page.fill('#discoveryCode',String(number));await page.locator('#codeForm button[type="submit"]').click();
     };
-    await enter(rewards[0]);assert.equal(await page.evaluate(n=>tabletopState.active.has(n),puzzle),true);
-    await enter(rewards[1]);assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),puzzle),true);
+    await page.evaluate(n=>openZoom(n),puzzle);
+    await page.getByRole('button',{name:'Take cards '+rewards.join(' and '),exact:true}).click();
+    assert.equal(await page.evaluate(ids=>ids.every(n=>flippedNumbers.has(n)),rewards),true);
+    assert.equal(await page.evaluate(n=>tabletopState.discarded.has(n),puzzle),true);
+    assert.equal(await page.locator('#codeDialog').evaluate(e=>e.open),false);
     // Find the second ingredient by solving the next puzzle, then drag a real pair.
     const pair=await page.evaluate(()=>{
       const p=[...tabletopState.active].find(n=>cardContent.get(n).puzzle&&!cardContent.get(n).puzzle.solved);
@@ -120,9 +123,9 @@ const server=http.createServer((req,res)=>{
           maxActive=Math.max(maxActive,tabletopState.active.size);
           if(tabletopState.active.size>4)throw Error('Overwhelming table');
           const puzzles=[...tabletopState.active].filter(n=>cardContent.get(n).puzzle&&!cardContent.get(n).puzzle.solved);
-          if(puzzles.length){const n=puzzles[0],c=cardContent.get(n);puzzleTypes.add(c.puzzle.type);c.puzzle.solved=true;onPuzzleSolved(c,n);continue;}
-          const codes=[...validCodeTargets()];
-          if(codes.length){drawTabletopCard(seed%2?codes[0]:codes.at(-1),'code');continue;}
+          if(puzzles.length){const n=puzzles[0],c=cardContent.get(n);puzzleTypes.add(c.puzzle.type);openZoom(n);c.puzzle.solved=true;onPuzzleSolved(c,n);closeZoom();continue;}
+          const clues=[...tabletopState.active].filter(n=>cardContent.get(n).unlocks?.some(id=>!flippedNumbers.has(id)));
+          if(clues.length){openZoom(seed%2?clues[0]:clues.at(-1));closeZoom();continue;}
           const pair=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)));
           if(pair){combineTabletopCards(...pair[1].requires);closeZoom();continue;}
           throw Error('Adventure stuck: '+book.id+' seed '+seed);
