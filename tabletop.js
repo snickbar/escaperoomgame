@@ -66,6 +66,7 @@ function collectTabletopRewards(context) {
   const rewards=tabletopRewardNumbers(context);
   rewards.forEach(n=>drawTabletopCard(n,'reward',context));
   if(rewards.length)showToast('New cards added to your table.');
+  revealFinalePiece();
 }
 function configureTabletopZoom() {
   const context=currentPuzzleContext;
@@ -123,10 +124,24 @@ function openSuccess({eyebrow,title,how,story,action,onClose}) {
   successOnClose=onClose;
   successDialog.showModal();document.getElementById('successTake').focus();
 }
-function finishSuccess() {const done=successOnClose;successOnClose=null;done?.();}
+function finishSuccess() {const done=successOnClose;successOnClose=null;done?.();scheduleGame(revealFinalePiece,350);}
 // The close event arrives a moment later; the button hands over cards at once.
 successDialog.addEventListener('close',finishSuccess);
 document.getElementById('successTake').onclick=()=>{finishSuccess();successDialog.close();};
+// The final piece has no clue of its own. Once every other lead is finished it
+// is handed over in its own pop-up, between other moments, never over them.
+function revealFinalePiece() {
+  if(!tabletopActive()||!tabletopState||runEnded||winPending)return;
+  if(zoomOverlay.classList.contains('open')||[codeDialog,discardDialog,combineDialog,successDialog,settingsDialog].some(d=>d.open))return;
+  const piece=[...cardContent].find(([n,c])=>c.isFinalePiece&&!flippedNumbers.has(n)&&unlockedNumbers.has(n));
+  if(!piece)return;
+  const [number,content]=piece;
+  const recipe=activeStory.recipes[content.chapter];
+  openSuccess({eyebrow:'Every lead is finished',title:'One last piece',
+    how:'With everything else solved, the '+content.backItem.name.toLowerCase()+' turns up at last.',
+    story:recipe[7],action:'Take card '+number,
+    onClose:()=>{if(drawTabletopCard(number,'finale'))showToast('The final piece joins your table.');}});
+}
 function showPuzzleSuccess(content,num) {
   const context={content,num};
   if(currentPuzzleContext?.content!==content)return;
@@ -255,11 +270,9 @@ function dealTabletop() {
   mistakes=0;lives=MAX_LIVES;renderLives();startTime=Date.now();
   buildStoryCardContent(randomInt(STORY_MODE_TABLE_SIZE_MIN,STORY_MODE_TABLE_SIZE_MAX));
   // Geometry clues belong to the old fixed grid. A changing table uses codes.
-  const finaleParts=new Set([...cardContent.values()].filter(c=>c.isFinale).flatMap(c=>c.requires));
-  cardContent.forEach((content,number)=>{
+  cardContent.forEach(content=>{
     if(!content.isProgress)return;
     content.hint=content.unlocks.length ? describeUnlocks(content.unlocks)
-      : finaleParts.has(number) ? 'Keep this for the finale. It completes the story once every other lead is finished.'
       : content.kind==='object' ? 'Drag this onto a related item to see what you can make.' : content.hint;
   });
   const root=[...cardContent].find(([,c])=>c.isSeed);
@@ -357,12 +370,13 @@ function validCodeTargets() {
 }
 
 function drawTabletopCard(number,via,source) {
-  if(via!=='code'&&via!=='combine'&&via!=='reward')return false;
+  if(via!=='code'&&via!=='combine'&&via!=='reward'&&via!=='finale')return false;
   if(!tabletopState||runEnded||winPending||flippedNumbers.has(number))return false;
   const c=cardContent.get(number);if(!c)return false;
   if(via==='code'&&!validCodeTargets().has(number))return false;
   if(via==='reward'&&!tabletopRewardNumbers(source).includes(number))return false;
-  if(via==='combine'&&(!c.requires||!c.requires.every(n=>tabletopState.active.has(n))||c.isFinale&&!unlockedNumbers.has(number)))return false;
+  if(via==='finale'&&!(c.isFinalePiece&&unlockedNumbers.has(number)))return false;
+  if(via==='combine'&&(!c.requires||!c.requires.every(n=>tabletopState.active.has(n))))return false;
   flippedNumbers.add(number);tabletopState.lastDraw=[number];
   refreshStoryUnlocks();syncTabletop();playCorrectSound();
   const drawn=tableEl.querySelector('[data-number="'+number+'"]');if(drawn)drawn.classList.add('just-drawn');
@@ -400,7 +414,7 @@ document.getElementById('codeForm').onsubmit=event=>{
     const source=codeEntrySource;codeDialog.close();
     if(source?.content.visualClue?.answer===number)openSuccess({eyebrow:'Hidden number found',title:'You found it!',
       how:'Card '+number+' was hidden in the picture. It is now on your table.',story:successStoryLine(number),action:'Continue',onClose:null});
-    else showToast('A new card joins your table.');
+    else {showToast('A new card joins your table.');revealFinalePiece();}
   }
   else {
     if(lives===1)codeDialog.close();
@@ -415,8 +429,6 @@ function combineTabletopCards(first,second) {
   if(![first,second].every(n=>tabletopState.active.has(n)&&isCombinableItem(n)))return false;
   const result=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.length===2&&c.requires.includes(first)&&c.requires.includes(second));
   if(!result){recordTabletopError(first+' + '+second,'Items do not combine');return false;}
-  // The right pair, but too early: no penalty, just a nudge.
-  if(result[1].isFinale&&!unlockedNumbers.has(result[0])){showToast('These belong together, but save them for the finale. Finish your other leads first.',4000);return false;}
   if(!drawTabletopCard(result[0],'combine'))return false;
   showToast('You made '+result[1].backItem.name+'!');
   openZoom(result[0]);return true;

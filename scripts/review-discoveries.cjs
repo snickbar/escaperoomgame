@@ -102,9 +102,10 @@ const server=http.createServer((req,res)=>{let file=path.resolve(root,'.'+new UR
      for(const [n,c] of cardContent)if(!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)))actions.push(()=>{combineTabletopCards(...c.requires);closeZoom();});
      if(!actions.length)throw Error('Branch deadlock '+book.id+' '+seed);
      actions[(step*7+seed)%actions.length]();
-     // The finale combination only appears once every other lead is complete.
-     const finale=[...cardContent].find(([,c])=>c.isFinale);
-     if(flippedNumbers.has(finale[0])&&[...cardContent].some(([n,c])=>c.isProgress&&!c.isWin&&!c.isFinale&&(!flippedNumbers.has(n)||c.puzzle&&!c.puzzle.solved)))throw Error('Finale before the other leads');
+     // The last finale piece only appears once every other lead is complete.
+     const piece=[...cardContent].find(([,c])=>c.isFinalePiece);
+     if(flippedNumbers.has(piece[0])&&[...cardContent].some(([n,c])=>c.isProgress&&!c.isWin&&!c.isFinalePiece&&!c.requires?.includes(piece[0])&&(!flippedNumbers.has(n)||c.puzzle&&!c.puzzle.solved)))throw Error('Finale piece before the other leads');
+     if(document.getElementById('successDialog').open)document.getElementById('successTake').click();
     }
     if(!winPending||[...cardContent].some(([n,c])=>c.isProgress&&!flippedNumbers.has(n)))throw Error('Unfinished branch');games++;
    }

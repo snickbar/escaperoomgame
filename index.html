@@ -3078,7 +3078,7 @@
 
       cardContent.set(num, {
         isProgress: true, kind: n.kind, chapter: n.chapter, title: n.isStart ? activeStory.title : n.isWin ? "Home safely" : backItem ? backItem.name : "Chapter " + (n.chapter + 1),
-        isStory: n.isStart, isWin: n.isWin, isFinale: !!n.isFinale, isSeed: n.isStart, hasBeat,
+        isStory: n.isStart, isWin: n.isWin, isFinalePiece: !!n.isFinalePiece, isSeed: n.isStart, hasBeat,
         unlocks: unlockNums, requires: requiresNums,
         message, hint, backItem, puzzle,
         // Two different illustrated places per run, rotating between runs.

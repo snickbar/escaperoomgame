@@ -3,7 +3,7 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.9.0 — a calmer table and fresh puzzle art
+## Current release: 0.9.1 — a calmer table and fresh puzzle art
 
 - Story Mode has one anchored top bar: **Home**, lives and **Hint** on the left,
   **Settings** on the right (story progress, journal, sound, testing tools).
@@ -12,8 +12,9 @@ https://snickbar.github.io/escaperoomgame/.
   a line of story, and a **Take cards** button. Dismissing it also takes them.
   Hidden-number pictures open a code box and celebrate a correct number.
 - Every crafted result now leads somewhere; none is a dead end in Discards.
-  The last combination waits until every other lead is finished, so the
-  finale really comes last. Trying it early costs no life.
+  The last finale piece has no clue of its own: once every other lead is
+  finished, an "Every lead is finished" pop-up hands it over, so the final
+  combination always comes last.
 - Logic puzzles use four places, three settings per story (never repeated in one
   run) and more kinds of notes: next to, not next to, somewhere left of, at an
   end, and between.
@@ -162,9 +163,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.9.0.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.9.1.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.9.0/EscapeRoom-0.9.0.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.9.1/EscapeRoom-0.9.1.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.9.0';
+const GAME_VERSION = '0.9.1';
 const GAME_SCHEMA = 'ER3';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
@@ -50,14 +50,16 @@ function buildAdventureGraph() {
   link(puzzles[0],b[1]);link(puzzles[1],b[0]);
   link(combo[0],a[5],puzzles[3]);link(combo[1],pictures[0]);link(pictures[0],b[2]);
   link(combo[2],puzzles[4]);link(puzzles[2],b[3]);
-  link(combo[3],a[7],puzzles[5]);link(puzzles[3],b[4]);
+  link(combo[3],puzzles[5]);link(puzzles[3],b[4]);
   link(combo[4],stories[1],logic[1]);link(stories[1],a[6]);
   link(puzzles[4],b[5]);link(combo[5],pictures[1]);
   link(puzzles[5],b[6]);link(logic[1],b[7]);
   // Every crafted result leads somewhere, so no discovery is a dead end.
   link(combo[6],a[8]);link(combo[7],puzzles[6]);link(puzzles[6],b[8]);link(combo[8],a[9]);
-  link(pictures[1],puzzles[7]);link(puzzles[7],b[9]);link(combo[9],win);
-  combo[9].isFinale=true;
+  link(pictures[1],puzzles[7]);link(puzzles[7],a[7]);link(combo[9],win);
+  // The last finale piece has no clue pointing to it: it appears by itself
+  // once every other lead is finished.
+  b[9].isFinalePiece=true;
   return nodes;
 }
 
@@ -123,11 +125,16 @@ function availableAdventureCards(cards, flipped) {
   });
   cards.forEach((c,num)=> {
     if (c.requires && c.requires.every(n=>flipped.has(n)) && !flipped.has(num)) available.add(num);
-    // The finale and the ending both wait until every other lead is finished.
-    if (c.isWin || c.isFinale) {
-      const complete=[...cards].every(([n,other])=>!other.isProgress || other.isWin || other.isFinale ||
+    if (c.isWin) {
+      const complete=[...cards].every(([n,other])=>!other.isProgress || other.isWin ||
         flipped.has(n) && (!other.puzzle || other.puzzle.solved));
       if (!complete) available.delete(num);
+    }
+    // Revealed only when everything except it, its recipe and the ending is done.
+    if (c.isFinalePiece && !flipped.has(num)) {
+      const complete=[...cards].every(([n,other])=>!other.isProgress || other.isWin || n===num ||
+        other.requires?.includes(num) || flipped.has(n) && (!other.puzzle || other.puzzle.solved));
+      if (complete) available.add(num);
     }
   });
   return available;

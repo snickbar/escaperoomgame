@@ -130,6 +130,8 @@ const server=http.createServer((req,res)=>{
           if(clues.length){openZoom(seed%2?clues[0]:clues.at(-1));closeZoom();continue;}
           const pair=[...cardContent].find(([n,c])=>!flippedNumbers.has(n)&&c.requires?.every(id=>tabletopState.active.has(id)));
           if(pair){combineTabletopCards(...pair[1].requires);closeZoom();continue;}
+          // The final piece arrives in its own pop-up once everything else is done.
+          if(document.getElementById('successDialog').open){document.getElementById('successTake').click();continue;}
           throw Error('Adventure stuck: '+book.id+' seed '+seed);
         }
         if(!winPending)throw Error('Ending not reached');
