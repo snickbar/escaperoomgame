@@ -1409,6 +1409,7 @@
   @media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
 </style>
 <link rel="stylesheet" href="tabletop.css">
+<link rel="stylesheet" href="puzzle-art.css">
 </head>
 <body>
 
@@ -1416,9 +1417,10 @@
   <p class="brand-kicker">A little mystery. A great escape.</p>
   <h1>Escape Room</h1>
   <p class="home-subtitle">Every discovery changes the story.</p>
-  <label class="story-picker" for="storyChoice">Story adventure
-    <select id="storyChoice"></select>
-  </label>
+  <section class="story-picker" aria-label="Story adventure">
+    <p>Choose your story</p><input id="storyChoice" type="hidden" value="lighthouse">
+    <div id="storyChoices" class="story-choices" role="group" aria-label="Choose your story"></div>
+  </section>
   <div class="deck-grid" id="deckGrid"></div>
 </div>
 
@@ -1512,6 +1514,7 @@
 
 <script src="story-content.js"></script>
 <script src="adventure-engine.js"></script>
+<script src="puzzle-art.js"></script>
 <script>
   const CARD_COUNT = 20;
   const STORY_NUMBER = 1;
@@ -1602,17 +1605,24 @@
     },
     swap: {
       id: 'swap',
-      label: 'Number Swap',
+      label: 'Picture Puzzle',
       icon: '\u{1F522}',
-      tagline: 'Tap two tiles to swap them into order',
+      tagline: 'Restore a picture from your story',
       accent: '#e0a34c',
     },
     pipes: {
       id: 'pipes',
-      label: 'Pipes',
+      label: 'Rusty Pipes',
       icon: '\u{1F6B0}',
       tagline: 'Rotate tiles in place to connect start to end',
       accent: '#4cc9c9',
+    },
+    electric: {
+      id: 'electric',
+      label: 'Electric Switchboard',
+      icon: '⚡',
+      tagline: 'Carry electricity through glowing glass tubes',
+      accent: '#769bcc',
     },
     shapes: {
       id: 'shapes',
@@ -2269,6 +2279,7 @@
   }
 
   function shapesCanPlace(piece, originR, originC, rows, cols, covered) {
+    if(piece.restorationOrigin && (originR!==piece.restorationOrigin[0] || originC!==piece.restorationOrigin[1]))return false;
     return piece.currentCells.every(([dr, dc]) => {
       const r = originR + dr;
       const c = originC + dc;
@@ -2277,7 +2288,8 @@
   }
 
   function shapesIsSolved(p) {
-    return p.pieces.every((piece) => piece.placed);
+    return p.pieces.every((piece) => piece.placed && (!p.restoration ||
+      piece.placedOrigin?.every((v,i)=>v===piece.solvedOrigin[i])));
   }
 
   // Dragging a piece to line up pixel-exactly with the one right cell it
@@ -2322,6 +2334,7 @@
         color: SHAPES_PALETTE[i % SHAPES_PALETTE.length],
         solvedCells,
         solvedOrigin,
+        restorationOrigin: solvedOrigin,
         currentCells,
         placed: false,
         placedOrigin: null,
@@ -2330,6 +2343,7 @@
 
     return {
       type: 'shapes',
+      restoration: true,
       rows,
       cols,
       pieces,
@@ -2343,7 +2357,7 @@
   // Story Mode picks one of these at random for each puzzle card.
   const PUZZLE_GENERATORS = [
     { make: makeCryptogramPuzzle, hint: '\u{1F9E9} Solve the puzzle to find your next card!' },
-    { make: makeSwapPuzzle, hint: '\u{1F522} Solve the number puzzle to find your next card!' },
+    { make: makeSwapPuzzle, hint: '\u{1F522} Restore the picture to find your next card!' },
     { make: makeShapesPuzzle, hint: '\u{1F7EA} Fit the pieces together to find your next card!' },
     { make: makePipesPuzzle, hint: '\u{1F6B0} Connect the pipes to find your next card!' },
   ];
@@ -2465,6 +2479,7 @@
   // --- Home screen ---
 
   function renderHome() {
+    if(typeof renderStoryChoices==='function')renderStoryChoices();
     const progress = loadProgress();
     deckGridEl.innerHTML = '';
     Object.values(DECKS).forEach((deck) => {
@@ -2999,6 +3014,7 @@
 
     const itemForId = assignStoryItems(nodes);
     const puzzleBag = [];
+    let storyPipeCount=0;
     function nextPuzzle() { if(!puzzleBag.length) puzzleBag.push(...shuffle(PUZZLE_GENERATORS)); return puzzleBag.pop(); }
 
     nodes.forEach((n) => {
@@ -3022,6 +3038,7 @@
       } else if (n.kind === 'puzzle') {
         const generator = nextPuzzle();
         puzzle = generator.make(unlockNums[0]);
+        if(puzzle.type==='pipes')puzzle.pipeStyle=(storyPipeCount++%2===(activeStory.id==='library'?0:1))?'electric':'water';
         puzzle.answers = unlockNums.slice();
         message = activeStory.recipes[n.chapter][7];
         hasBeat = true;
@@ -3288,6 +3305,7 @@
   // own grid container and hides the others.
   function renderPuzzle(content, num, opts) {
     if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
+    configurePuzzleArt(content);
     if (content.puzzle.type === 'slider') {
       renderSliderPuzzle(content, num, opts);
     } else if (content.puzzle.type === 'swap') {
@@ -3337,6 +3355,7 @@
 
     let activeIndex = -1;
     let hintedIndices = new Set();
+    let drawnGuesses = [];
     for (let i = 0; i < p.ciphertext.length; i++) {
       if (p.ciphertext[i] !== ' ' && !p.guesses[i]) {
         activeIndex = i;
@@ -3472,7 +3491,7 @@
         unit.className = 'cipher-letter';
         unit.innerHTML = `
           ${cipherCharInner}
-          <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}${isHinted ? ' hinted' : ''}">${guess || '_'}</div>
+          <div class="cipher-blank${i === activeIndex ? ' active' : ''}${isCorrect ? ' correct' : ''}${isWrong ? ' wrong' : ''}${isHinted ? ' hinted' : ''}"><span class="${guess&&drawnGuesses[i]!==guess?'pencil-mark':''}">${guess || '_'}</span></div>
         `;
         unit.querySelector('.cipher-blank').addEventListener('click', () => {
           activeIndex = i;
@@ -3481,6 +3500,7 @@
         });
         wordEl.appendChild(unit);
       });
+      drawnGuesses=p.guesses.slice();
     }
 
     function renderKeyboard() {
@@ -3637,8 +3657,7 @@
     pipesGridEl.hidden = true;
     shapesAreaEl.hidden = true;
 
-    puzzleInstructionsEl.textContent = 'Tap a tile, then tap another to swap them. ' +
-      'Arrange 1 through 16 in order to solve it.';
+    puzzleInstructionsEl.textContent = 'Restore the picture. Tap two fragments to swap them. Use View reference if you need a closer look.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3719,7 +3738,10 @@
         const isCorrect = value === solved[i];
         tile.className = 'swap-tile' + (i === selectedIdx ? ' selected' : '') +
           (isCorrect ? ' correct' : '') + (hintedIndices.has(i) ? ' hinted' : '');
-        tile.textContent = String(value);
+        tile.setAttribute('aria-label','Picture fragment '+value+', position '+(i+1));
+        tile.style.backgroundImage='url("'+p.artwork+'")';
+        tile.style.backgroundSize=(SWAP_SIZE*100)+'% '+(SWAP_SIZE*100)+'%';
+        tile.style.backgroundPosition=((value-1)%SWAP_SIZE)/(SWAP_SIZE-1)*100+'% '+Math.floor((value-1)/SWAP_SIZE)/(SWAP_SIZE-1)*100+'%';
         tile.disabled = p.solved;
         tile.addEventListener('click', () => {
           if (p.solved) return;
@@ -3761,8 +3783,9 @@
     pipesGridEl.hidden = false;
     shapesAreaEl.hidden = true;
 
-    puzzleInstructionsEl.textContent = 'Tap a pipe to rotate it. Connect S (start) to E (end) — ' +
-      'those two are fixed in place.';
+    puzzleInstructionsEl.textContent = p.pipeStyle==='electric'
+      ? 'Rotate the glass tubes to carry electricity from POWER to the LAMP. The terminals stay fixed.'
+      : 'Rotate the rusty pipes to carry water from the TAP to the TANK. The ends stay fixed.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3782,6 +3805,7 @@
     puzzleHintEl.onclick = useHint;
 
     let hintedKey = null;
+    const flowHistory=new Map();
 
     function updateHintButton() {
       puzzleHintEl.textContent = '\u{1F4A1} Hint (' + p.hintsRemaining + ')';
@@ -3826,7 +3850,7 @@
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
           zoomHintEl.textContent = puzzleResultText(p);
-        }, 900);
+        }, Math.max(1200,...[...flowHistory.values()].map(flow=>flow.arrival-performance.now()+850)));
       }
     }
 
@@ -3834,7 +3858,8 @@
       pipesGridEl.innerHTML = '';
       pipesGridEl.style.gridTemplateColumns = 'repeat(' + p.cols + ', 46px)';
       pipesGridEl.style.gridTemplateRows = 'repeat(' + p.rows + ', 46px)';
-      const connected = pipesConnectedSet(p.tiles);
+      const flow = pipeFlowState(p,flowHistory);
+      const connected = new Set(flow.keys());
       p.tiles.forEach((t) => {
         const key = t.row + ',' + t.col;
         const fixed = t.isStart || t.isEnd || !t.isPath;
@@ -3845,15 +3870,13 @@
           (connected.has(key) ? ' connected' : '') +
           (hintedKey === key ? ' hinted' : '');
         tile.disabled = p.solved || fixed;
+        tile.setAttribute('aria-label',t.isStart?(p.pipeStyle==='electric'?'POWER source, fixed':'TAP source, fixed'):t.isEnd?(p.pipeStyle==='electric'?'LAMP destination, fixed':'TANK destination, fixed'):!t.isPath?'Mounting plate':'Tube row '+(t.row+1)+', column '+(t.col+1)+', openings '+Object.keys(DIR_BIT).filter(d=>t.openings&DIR_BIT[d]).join(', ')+'. Tap to rotate.');
         let inner = '';
         if (t.isPath) {
-          inner += '<div class="pipe-hub"></div>';
-          ['N', 'S', 'E', 'W'].forEach((dir) => {
-            if (t.openings & DIR_BIT[dir]) inner += '<div class="pipe-arm ' + dir.toLowerCase() + '"></div>';
-          });
+          inner += pipeTubeArt(t,flow.get(key),p.pipeStyle);
         }
-        if (t.isStart) inner += '<div class="pipe-badge start">S</div>';
-        if (t.isEnd) inner += '<div class="pipe-badge end">E</div>';
+        if (t.isStart) inner += '<div class="pipe-badge start">'+(p.pipeStyle==='electric'?'⚡':'TAP')+'</div>';
+        if (t.isEnd) inner += '<div class="pipe-badge end">'+(p.pipeStyle==='electric'?'💡':'TANK')+'</div>';
         tile.innerHTML = inner;
         tile.addEventListener('click', () => {
           if (p.solved || fixed) return;
@@ -3870,6 +3893,11 @@
     }
 
     renderTiles();
+    if(p.solved){
+      puzzleFeedbackEl.className='puzzle-feedback correct';
+      puzzleFeedbackEl.textContent=isTest?'✓ Solved! ('+p.answer+')':'✓ Correct! '+puzzleResultText(p);
+      puzzleAgainEl.hidden=!isTest;
+    }
 
     puzzleAgainEl.onclick = () => {
       if (opts.onRetry) opts.onRetry();
@@ -3892,8 +3920,7 @@
     pipesGridEl.hidden = true;
     shapesAreaEl.hidden = false;
 
-    puzzleInstructionsEl.textContent = 'Drag a piece onto the board — it’ll snap into place ' +
-      'if it fits nearby.';
+    puzzleInstructionsEl.textContent = 'Put the torn document back together. Drag fragments onto the faded outline; the writing and drawing must line up. Pieces snap to their original places. No rotation needed.';
     puzzleFeedbackEl.textContent = '';
     puzzleFeedbackEl.className = 'puzzle-feedback';
     puzzleAgainEl.hidden = true;
@@ -3984,6 +4011,7 @@
           const cellEl = document.createElement('div');
           cellEl.className = 'shapes-ghost-cell';
           cellEl.style.background = cellSet.has(r + ',' + c) ? piece.color : 'transparent';
+          if(cellSet.has(r+','+c))paintRestorationCell(cellEl,p,piece,r,c,SHAPES_CELL_PX);
           ghost.appendChild(cellEl);
         }
       }
@@ -3998,8 +4026,8 @@
 
     function candidateOrigin(clientX, clientY) {
       const rect = shapesGridEl.getBoundingClientRect();
-      const localX = clientX - drag.widthPx / 2 - rect.left - SHAPES_GRID_PAD_PX;
-      const localY = clientY - drag.heightPx / 2 - rect.top - SHAPES_GRID_PAD_PX;
+      const localX = clientX - drag.widthPx / 2 - rect.left - shapesGridEl.clientLeft - SHAPES_GRID_PAD_PX;
+      const localY = clientY - drag.heightPx / 2 - rect.top - shapesGridEl.clientTop - SHAPES_GRID_PAD_PX;
       return [Math.round(localY / SHAPES_GRID_PITCH_PX), Math.round(localX / SHAPES_GRID_PITCH_PX)];
     }
 
@@ -4092,7 +4120,7 @@
       let previewValid = false;
       if (drag && drag.candidateRow !== undefined) {
         const snapOrigin = shapesFindSnapOrigin(
-          { currentCells: drag.piece.currentCells }, drag.candidateRow, drag.candidateCol, p.rows, p.cols, covered, 1
+          drag.piece, drag.candidateRow, drag.candidateCol, p.rows, p.cols, covered, 1
         );
         previewValid = !!snapOrigin;
         const [pr, pc] = snapOrigin || [drag.candidateRow, drag.candidateCol];
@@ -4108,7 +4136,7 @@
             (pieceId !== null && pieceId === hintedPieceId ? ' hinted' : '');
           if (pieceId !== null) {
             const piece = p.pieces.find((pc) => pc.id === pieceId);
-            cell.style.background = piece.color;
+            paintRestorationCell(cell,p,piece,r-piece.placedOrigin[0],c-piece.placedOrigin[1],SHAPES_CELL_PX);
             if (!p.solved) {
               cell.addEventListener('pointerdown', (evt) => startDrag(piece, evt));
             }
@@ -4137,6 +4165,7 @@
             const cellEl = document.createElement('div');
             cellEl.className = 'shapes-piece-cell';
             cellEl.style.background = cellSet.has(r + ',' + c) ? piece.color : 'transparent';
+            if(cellSet.has(r+','+c))paintRestorationCell(cellEl,p,piece,r,c,20);
             wrap.appendChild(cellEl);
           }
         }
@@ -4165,7 +4194,7 @@
       const target = 1 + Math.floor(gameRandom() * CARD_COUNT);
       const makers = {
         cryptogram: makeCryptogramPuzzle, cipher: makeCipherPuzzle,
-        slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle, shapes: makeShapesPuzzle,
+        slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle, electric: makePipesPuzzle, shapes: makeShapesPuzzle,
       };
       content = {
         isStory: false,
@@ -4174,6 +4203,7 @@
         puzzle: makers[type](target),
         backItem: null,
       };
+      if(type==='electric'||type==='pipes')content.puzzle.pipeStyle=type==='electric'?'electric':'water';
     }
 
     if (!content) return;

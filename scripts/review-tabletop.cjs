@@ -20,7 +20,7 @@ const server=http.createServer((req,res)=>{
     await page.locator('#adventureHero img').evaluate(image=>image.decode());
     await page.screenshot({path:path.join(out,'tabletop-home.png'),fullPage:true});
     for(const theme of ['library','lucy','lighthouse']){
-      await page.selectOption('#storyChoice',theme);await page.locator('#adventureHero img').evaluate(image=>image.decode());
+      await page.locator('[data-story="'+theme+'"]').click();await page.locator('#adventureHero img').evaluate(image=>image.decode());
     }
     await page.locator('#beginAdventure').click();
     assert.equal(await page.locator('#zoomOverlay').evaluate(e=>e.classList.contains('open')),true);

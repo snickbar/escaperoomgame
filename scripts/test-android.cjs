@@ -28,14 +28,16 @@ function nodes() {
 }
 function waitForText(text) {
   const deadline=Date.now()+25000;
-  do {const list=nodes();if(list.some(n=>(n.text||'').includes(text)))return list;}while(Date.now()<deadline);
+  do {const list=nodes();if(list.some(n=>(n.text||'').toLowerCase().includes(text.toLowerCase())))return list;}while(Date.now()<deadline);
   throw Error('Android screen did not become ready: '+text);
 }
 function tapText(text, list=nodes()) {
   for(let attempt=0;attempt<5;attempt++) {
+    const footerTop=Math.min(...list.filter(n=>['soundToggle','testingToggle'].includes(n['resource-id'])).map(n=>Number(n.bounds.match(/\d+/g)[1])),Infinity);
     const node=list.find(n=>{
       const b=(n.bounds||'').match(/-?\d+/g)?.map(Number);
-      return (n.text||'').includes(text)&&b&&b[2]>b[0]&&b[3]>b[1];
+      const inFooter=['soundToggle','testingToggle'].includes(n['resource-id']);
+      return (n.text||'').includes(text)&&b&&b[2]>b[0]&&b[3]>b[1]&&(inFooter||(b[1]+b[3])/2<footerTop-20);
     });
     if(node){tapNode(node);return;}
     shell('input','swipe','540','1700','540','600','300');list=nodes();
@@ -85,7 +87,8 @@ try {
   assert.ok(nodes().some(n=>n.text==='The Last Light'),'Cancel must preserve the game');
   shell('input','keyevent','4');
   tapNode(waitForText('Return to home?').find(n=>n['resource-id']==='android:id/button1'));
-  tapText('Quick play');tapText('Mini-Games Try out');tapText('Shapes');
+  tapText('Quick play');
+  tapText('Mini-Games Try out');tapText('Shapes');
   ui=nodes();assert.ok(ui.some(n=>(n.text||'').toLowerCase().includes('shapes test')),'Native puzzle must render');
   screenshot('android-shapes.png');
   shell('input','keyevent','4');
@@ -98,7 +101,7 @@ try {
   screenshot('android-gallery.png');
   shell('input','keyevent','4');
   shell('input','swipe','540','500','540','1800','300');
-  assert.ok(waitForText('Story adventure').some(n=>n.text==='Story adventure'),'Back from gallery must restore home');
+  assert.ok(waitForText('Choose your story').some(n=>n.text.toLowerCase()==='choose your story'),'Back from gallery must restore home');
   console.log('Signed APK installed; offline home/story/puzzle/gallery, native Back and saved preference checks passed.');
 } finally {
   shell('svc','wifi','enable');shell('svc','data','enable');

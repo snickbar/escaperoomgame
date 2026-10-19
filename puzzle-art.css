@@ -1,0 +1,73 @@
+/* Story selections are always visible: no dropdown menus. */
+.story-picker { max-width:none; margin:0 0 24px; }
+.story-picker>p { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; margin:0 0 12px; }
+.story-choices { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+.story-choices button { display:flex; align-items:center; gap:12px; padding:8px; text-align:left; border:1px solid #c8caba; border-radius:12px; background:#fffcf3; color:#486052; cursor:pointer; min-height:66px; }
+.story-choices img { width:55px; height:55px; object-fit:cover; border-radius:7px; }
+.story-choices span { font:16px/1.25 Georgia,serif; }
+.story-choices button[aria-pressed=true] { border:2px solid #23655f; background:#e4eddf; box-shadow:0 2px 0 #23655f33; }
+.story-choices button:focus-visible,.puzzle-art-tools button:focus-visible { outline:3px solid #bd8d3b; outline-offset:3px; }
+.puzzle-art-tools { width:100%; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.puzzle-art-tools:empty { display:none; }
+.puzzle-art-tools button { color:#355c55; background:#fbf6e7; border:1px solid #c4baa3; border-radius:8px; min-height:40px; padding:8px 12px; font:12px system-ui; cursor:pointer; }
+.puzzle-style-choices { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.puzzle-style-choices button[aria-pressed=true] { background:#31584f; color:#fff7e5; border-color:#31584f; }
+.flow-legend { font:600 11px system-ui; letter-spacing:.7px; margin:0; color:#6d614b; }
+.puzzle-reference { width:180px; max-width:100%; aspect-ratio:1; object-fit:fill; border:6px solid #eee2c9; border-radius:4px; box-shadow:0 3px 10px #30291c22; }
+/* Picture fragments retain their cropping when selected, hovered, or solved. */
+#swapGrid { gap:2px; padding:9px; background:#5a4431; border:2px solid #b89665; border-radius:7px; box-shadow:0 6px 18px #48301b25; }
+#swapGrid .swap-tile { border-radius:1px; background-repeat:no-repeat; border:0; filter:sepia(.08); }
+#swapGrid .swap-tile:hover { filter:brightness(1.12); }
+#swapGrid .swap-tile.selected { box-shadow:0 0 0 3px #fff4b8 inset; filter:brightness(1.2); transform:scale(.93); }
+#swapGrid .swap-tile.correct { box-shadow:none; }
+#swapGrid .swap-tile.hinted { outline:2px solid #d1a248; outline-offset:-2px; }
+/* Real tube paths, empty bores, worn metal and glass highlights. */
+#pipesGrid { gap:0; padding:14px; border:8px ridge #976f4d; border-radius:12px; background:radial-gradient(ellipse at 20% 30%,#8b5d3844,transparent 70%),repeating-linear-gradient(95deg,#302c25 0 2px,#373129 2px 7px); box-shadow:0 8px 18px #30251d40; }
+#pipesGrid[data-style=electric] { border-color:#657b7b; background:radial-gradient(circle at 15% 15%,#486169,#1c2c32 80%); }
+#pipesGrid .pipe-tile { width:46px; height:46px; border-radius:0; background:transparent; overflow:visible; }
+#pipesGrid .pipe-tile:hover { background:#ffffff10; }
+#pipesGrid .pipe-tile.empty { background:radial-gradient(circle,#968567 0 2px,transparent 3px); }
+#pipesGrid .pipe-tile.start { box-shadow:0 0 0 2px #8de1cd inset; border-radius:6px; background:#42c6b518; }
+#pipesGrid .pipe-tile.end { box-shadow:0 0 0 2px #e4bc68 inset; border-radius:6px; background:#e4bc6818; }
+#pipesGrid .pipe-badge { font:700 7px system-ui; top:-7px; left:1px; padding:2px; color:#162624; background:#9be3d6; }
+#pipesGrid .pipe-badge.end { top:auto; bottom:-7px; background:#efce89; }
+.tube-art { width:100%; height:100%; overflow:visible; fill:none; stroke-linecap:butt; }
+.tube-shadow { stroke:#100e0b; stroke-width:23; transform:translate(1px,2px); opacity:.6; }
+.tube-metal { stroke:#9b6038; stroke-width:21; }
+.tube-bore { stroke:#29251e; stroke-width:11; }
+.tube-shine { stroke:#e4b17a; stroke-width:1; transform:translate(-6px,-4px); opacity:.35; }
+.tube-collar { stroke:#ba8954; stroke-width:3; fill:none; }
+.tube-fill,.tube-motion { stroke-width:7; stroke:#58bddb; opacity:0; }
+.has-flow .tube-fill { opacity:1; stroke-dasharray:1; stroke-dashoffset:1; animation:tube-fill 260ms linear var(--fill-delay) forwards; }
+.has-flow .tube-motion { stroke:#e0fbff; stroke-width:2; stroke-dasharray:.035 .12; opacity:0; animation:tube-current 1s linear calc(var(--fill-delay) + 260ms) infinite; }
+#pipesGrid[data-style=electric] .tube-metal { stroke:#a6c5c6; stroke-width:20; opacity:.5; }
+#pipesGrid[data-style=electric] .tube-bore { stroke:#192d3a; stroke-width:13; }
+#pipesGrid[data-style=electric] .tube-rust { display:none; }
+#pipesGrid[data-style=electric] .tube-shine { stroke:#eeffff; stroke-width:2; opacity:.7; }
+#pipesGrid[data-style=electric] .tube-collar { stroke:#c1a468; }
+#pipesGrid[data-style=electric] .tube-fill { stroke:#84b6f6; stroke-width:6; filter:drop-shadow(0 0 3px #53d8ff); }
+#pipesGrid[data-style=electric] .tube-motion { stroke:#fff5ad; stroke-width:3; stroke-dasharray:.09 .14; filter:drop-shadow(0 0 2px #fff); animation-duration:.45s; }
+@keyframes tube-fill { to { stroke-dashoffset:0; } }
+@keyframes tube-current { from { stroke-dashoffset:0; opacity:.85; } to { stroke-dashoffset:-.31; opacity:.85; } }
+/* Pencil on a notebook, with code groups above the handwritten blanks. */
+#zoomPuzzle[data-puzzle=cryptogram] #cipherGrid,#zoomPuzzle[data-puzzle=cipher] #cipherGrid { padding:24px 6px 20px; border:1px solid #cbbd9c; border-radius:2px 8px 5px 3px; background:linear-gradient(90deg,transparent 9px,#bd77704d 9px 10px,transparent 10px),repeating-linear-gradient(#f8efd8 0 27px,#c5c6ad 28px,#f8efd8 29px 56px); box-shadow:0 5px 14px #4c3e2326; gap:14px 10px; box-sizing:border-box; }
+#cipherGrid .cipher-cipherchar { color:#82745d; font:10px 'Courier New',monospace; }
+#cipherGrid .cipher-blank { width:21px; font:italic 600 23px/1 'Segoe Print','Bradley Hand',cursive; color:#4e4b43; border-bottom:1px solid #79705a; border-radius:0; text-shadow:.5px .6px #6e685755; background:transparent; }
+#cipherGrid .cipher-blank.active { background:#e0c77955; outline:1px dashed #9a8959; }
+#cipherGrid .cipher-blank.correct { color:#414c42; border-color:#6b7662; }
+#cipherGrid .cipher-blank.wrong { color:#a0493d; border-color:#a0493d; }
+#cipherGrid .cipher-word { gap:2px; }
+.pencil-mark { display:inline-block; animation:pencil-write 230ms ease-out both; clip-path:inset(0 0 0 0); }
+@keyframes pencil-write { from { clip-path:inset(0 100% 0 0); opacity:.3; transform:translateY(-2px); } to { clip-path:inset(0); opacity:1; transform:translateY(0); } }
+/* Document fragments share one continuous source image, never a new random crop. */
+#shapesGrid { position:relative; isolation:isolate; background:#dac8a5; border:5px solid #8d7452; box-shadow:0 5px 13px #44301c24; }
+#shapesGrid:before { content:''; position:absolute; inset:4px; background-image:var(--document-image); background-size:100% 100%; opacity:.13; z-index:-1; }
+#shapesGrid .shapes-cell { border-radius:0; background-color:#f8edd53d; }
+.document-fragment { border-radius:0!important; background-repeat:no-repeat!important; box-shadow:inset 0 0 0 .5px #6e594d35; }
+#shapesTray { padding:12px 6px; border-top:1px dashed #b4a079; }
+#shapesTray .shapes-piece { background:#ede4cf; box-shadow:0 3px 7px #60452b25; border-bottom:2px solid var(--line); }
+#shapesTray .shapes-piece-cell { width:20px; height:20px; }
+#shapesGrid .shapes-cell.preview-valid { box-shadow:0 0 0 2px #327e5d inset; }
+#shapesGrid .shapes-cell.preview-invalid { box-shadow:0 0 0 2px #b94636 inset; }
+@media(max-width:560px){ .story-choices { gap:7px; } .story-choices button { flex-direction:column; text-align:center; gap:7px; padding:8px 4px; } .story-choices img { width:100%; height:70px; } .story-choices span { font-size:13px; } }
+@media(prefers-reduced-motion:reduce){ .has-flow .tube-fill { animation:none; stroke-dashoffset:0; } .has-flow .tube-motion { animation:none; opacity:.8; } .pencil-mark { animation:none; } }

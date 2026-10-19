@@ -1,4 +1,4 @@
-const GAME_VERSION = '0.6.1';
+const GAME_VERSION = '0.7.0';
 const GAME_SCHEMA = 'ER2';
 let activeStory = STORY_BOOK[0];
 let runSeed = 0;
@@ -158,6 +158,7 @@ function validateAdventure(cards, numbers) {
 // Translation-only exact-cover solver, with a bounded search and a known
 // original tiling as the fallback for hints on a player-created dead end.
 function solveShapeRemainder(p, limit=50000) {
+  if(p.restoration&&p.pieces.some(pc=>pc.placed&&pc.placedOrigin?.some((v,i)=>v!==pc.solvedOrigin[i])))return null;
   let visits=0;
   const covered=shapesCoverage(p);
   function search(remaining) {

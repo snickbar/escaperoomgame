@@ -3,7 +3,24 @@
 A browser game and installable offline web app. Published from `master` to
 https://snickbar.github.io/escaperoomgame/.
 
-## Current release: 0.6.1 — the active table
+## Current release: 0.7.0 — story puzzle artwork
+
+Story selection uses visible illustrated buttons. Product UI should not use dropdown menus.
+
+- **Rusty Pipes** fills with animated water; **Electric Switchboard** carries light
+  through glass tubes. Both are in the mini-game workshop and each story includes
+  one of each. Source and destination stay fixed; only a connected path carries flow.
+- **Picture Puzzle** replaces visible numbers with fragments of story artwork.
+  Tap two fragments to swap them; a reference image is available.
+- **Shapes** restores an illustrated document for the selected story. Fragments
+  snap to their original positions, so both the geometry and the picture match.
+  Board sizes still vary from 20 to 30 cells, with two safe hints.
+- **Cryptogram** uses notebook paper and animated pencil lettering. Matching
+  letters still fill together. Motion respects the device's reduced-motion setting.
+
+Future art directions: a shattered painted plate or stained-glass panel for Shapes,
+a restored photograph that becomes an inventory item, and a charcoal rubbing
+variant for the cryptogram. Artwork alone never changes story reward rules.
 
 Choose **The Last Light**, **The Midnight Archive**, or **Pip Beyond the
 Garden**, then **Begin adventure**. The opening goes into your discoveries;
@@ -25,7 +42,7 @@ cards instead of a full spread.
 
 Each story has ten combinations, eight puzzles, two interludes, an opening
 and an ending. All 42 progression cards must be discovered. Cryptogram,
-Number Swap, Shapes and Pipes each appear twice. The changing table uses
+Picture Puzzle, Shapes and Pipes each appear twice. The changing table uses
 numbered codes from 0–199 rather than positional neighbor clues. The deck
 counter shows undiscovered story cards, not trap guesses.
 
@@ -113,9 +130,9 @@ project owner's standing preference.
 
 The game can also be packaged as an offline Android APK. See
 [`android/README.md`](android/README.md) for building, signing and installation.
-Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.6.1.apk`.
+Run `scripts/build-android.ps1` to produce `dist/EscapeRoom-0.7.0.apk`.
 
-[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.6.1/EscapeRoom-0.6.1.apk)
+[Download the Android APK](https://github.com/snickbar/escaperoomgame/releases/download/android-v0.7.0/EscapeRoom-0.7.0.apk)
 on your phone, open it and choose Install. Android 8.0 or newer is required.
 The app works offline; its saved progress is separate from the browser version.
 

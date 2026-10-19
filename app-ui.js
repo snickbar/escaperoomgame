@@ -1,7 +1,18 @@
 // Player controls and local developer tools. This is a local testing mode,
 // not authentication or a security boundary in this static offline game.
 const storyChoiceEl=document.getElementById('storyChoice');
-storyChoiceEl.innerHTML=STORY_BOOK.map(b=>`<option value="${b.id}">${b.title}</option>`).join('');
+function renderStoryChoices(){
+  const choices=document.getElementById('storyChoices');
+  if(!choices)return;
+  choices.replaceChildren();
+  STORY_BOOK.forEach(book=>{
+    const button=document.createElement('button');button.type='button';button.dataset.story=book.id;
+    button.setAttribute('aria-pressed',String(storyChoiceEl.value===book.id));
+    const image=document.createElement('img');image.src='art/scenes/'+book.id+'.png';image.alt='';
+    const label=document.createElement('span');label.textContent=book.title;
+    button.append(image,label);button.onclick=()=>{storyChoiceEl.value=book.id;renderHome();};choices.appendChild(button);
+  });
+}
 storyChoiceEl.onchange=renderHome;
 renderHome();
 document.body.insertAdjacentHTML('beforeend', `

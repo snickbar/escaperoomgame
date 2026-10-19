@@ -25,7 +25,7 @@ const server=http.createServer((req,res)=> {
     // These checks retain coverage for the original full-grid presentation.
     // review-tabletop.cjs exercises the new default active-table adventure.
     await page.evaluate(()=>{tabletopEnabled=false;});
-    assert.equal(await page.locator('#storyChoice option').count(),3);
+    assert.equal(await page.locator('#storyChoices button').count(),3);
     await page.screenshot({path:path.join(out,'home.png'),fullPage:true});
     console.log('Home loaded',errors);
     const logic=await page.evaluate(()=> {
