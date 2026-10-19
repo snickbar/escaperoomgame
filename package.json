@@ -1,0 +1,12 @@
+{
+  "name": "escape-room-card-game",
+  "version": "0.5.0",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/review-game.cjs",
+    "art": "node scripts/make-story-art.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}

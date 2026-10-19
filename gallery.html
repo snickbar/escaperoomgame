@@ -101,7 +101,7 @@
   .item img {
     width: 100%;
     aspect-ratio: 385 / 507;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     display: block;
@@ -132,11 +132,12 @@
 <div class="wrap">
   <a class="home-link" href="./index.html">&larr; Back to the game</a>
   <h1>&#128444;&#65039; Art Gallery</h1>
-  <p class="subtitle">Every combo triad in the game — blue and yellow ingredients combine into the green result. Loaded straight from the game's own data, so this stays current as more get added.</p>
+  <p class="subtitle">Every combo triad in the game — two ingredients combine into the result. Includes the original illustrated sets and the new story collections. Loaded straight from the game's own data, so this stays current as more get added.</p>
   <div id="status" class="status">Loading artwork&hellip;</div>
   <div id="gallery" class="theme-grid"></div>
   <p id="count" class="count" hidden></p>
 </div>
+<script src="story-content.js"></script>
 <script>
   fetch('./index.html')
     .then((r) => {
@@ -148,7 +149,7 @@
       if (!match) throw new Error('Could not find COMBO_SETS in index.html');
       // Safe to evaluate: this is our own trusted file, not user input.
       const COMBO_SETS = new Function('return ' + match[1])();
-      renderGallery(COMBO_SETS);
+      renderGallery([...COMBO_SETS, ...STORY_RECIPES]);
     })
     .catch((err) => {
       const statusEl = document.getElementById('status');
@@ -169,7 +170,7 @@
       const card = document.createElement('div');
       card.className = 'theme-card';
       card.innerHTML = `
-        <div class="theme-name">${themeNameFromPath(set.a.img)}</div>
+        <div class="theme-name">${set.theme ? STORY_BOOK.find(b=>b.id===set.theme).title + " · " + set.title : themeNameFromPath(set.a.img)}</div>
         <div class="triad">
           <div class="item">
             <img src="${set.a.img}" alt="${set.a.name}" loading="lazy">

@@ -1362,6 +1362,48 @@
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+  body { -webkit-user-select:none; user-select:none; }
+  input, textarea { -webkit-user-select:text; user-select:text; }
+  .story-picker { display:grid; gap:8px; max-width:440px; margin:0 auto 18px; color:#c3d4df; }
+  .story-cover { width:48px; height:56px; object-fit:contain; display:block; border-radius:8px; }
+  .cipher-grid { container-type:inline-size; }
+  .cipher-blank { width:clamp(20px,8cqw,26px); }
+  .cipher-key { min-height:44px; min-width:36px; }
+  .shapes-piece { min-height:44px; padding:6px; }
+  .shapes-piece-cell { width:20px; height:20px; }
+  select, .dev-panel input, .dev-panel textarea { width:100%; padding:12px; background:#202a36; color:#eef4f9; border:1px solid #496074; border-radius:10px; font:inherit; }
+  .adventure-status { max-width:560px; margin:0 auto 16px; padding:14px; border:1px solid #3d5367; border-radius:12px; line-height:1.5; color:#c3d4df; }
+  .adventure-status:empty { display:none; }
+  .adventure-status img { width:64px; height:72px; object-fit:contain; float:left; margin-right:12px; }
+  .card-face { min-width:0; }
+  .card-front .message, .card-front .hint { flex-shrink:0; overflow-wrap:anywhere; width:100%; }
+  .card-front .message { font-size:clamp(7px,10cqw,12px); }
+  .card-front .hint { font-size:clamp(6px,8cqw,10px); }
+  .card-front .front-number { flex-shrink:0; opacity:1; color:#d9e8ef; }
+  .card-back .card-number { color:#b5c9db; }
+  .card-front.has-art .front-icon .item-art { object-fit:contain; }
+  .item-art { object-fit:contain; }
+  .zoom-card { overflow-y:auto; justify-content:flex-start; padding:52px 20px 24px; max-height:88dvh; aspect-ratio:auto; -webkit-user-select:none; user-select:none; }
+  .zoom-card .zoom-message, .zoom-card.story .zoom-message { font-size:18px; line-height:1.55; }
+  .zoom-item-art { flex-shrink:0; }
+  .zoom-close { position:sticky; top:0; margin:-38px -6px -8px auto; flex-shrink:0; min-width:44px; min-height:44px; z-index:2; }
+  .win-card { max-height:88dvh; overflow:auto; }
+  #winStoryRecap, #winErrorRecap { font-size:14px; line-height:1.6; text-align:left; }
+  .dev-panel { max-width:560px; margin:20px auto; padding:16px; border:1px solid #465565; border-radius:12px; }
+  .dev-panel[hidden] { display:none; }
+  .dev-panel button, .utility-bar button { padding:10px 14px; border:1px solid #506074; border-radius:9px; background:#263446; color:#e5edf6; cursor:pointer; margin:4px; font:inherit; }
+  .dev-panel label { display:block; margin:12px 0; }
+  .utility-bar { max-width:560px; margin:24px auto 0; text-align:center; color:#91a7b8; font-size:12px; }
+  .utility-bar { position:fixed; bottom:0; left:0; right:0; z-index:900; max-width:none; margin:0; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); background:#14161cf5; border-top:1px solid #354352; }
+  body { padding-bottom:calc(130px + env(safe-area-inset-bottom)); }
+  #updateApp { border-color:#79d4e7; color:#b8eaf4; }
+  .dev-panel textarea { min-height:180px; font-family:monospace; font-size:12px; }
+  .toast { max-width:calc(100vw - 32px); width:max-content; }
+  .table { max-width:620px; gap:clamp(6px,2vw,16px); margin:auto; }
+  .shapes-ghost { filter:drop-shadow(0 8px 8px #0008); }
+  .shapes-cell.filled { transition:background-color .15s ease; }
+  .pipe-tile.connected .pipe-arm, .pipe-tile.connected .pipe-hub { box-shadow:0 0 7px #7ee6a850; }
+  @media(prefers-reduced-motion:reduce) { *, *::before, *::after { animation:none!important; transition:none!important; scroll-behavior:auto!important; } }
 </style>
 </head>
 <body>
@@ -1369,6 +1411,9 @@
 <div id="homeScreen">
   <h1>Escape Room Card Game</h1>
   <p class="home-subtitle">Choose a deck to play</p>
+  <label class="story-picker" for="storyChoice">Story adventure
+    <select id="storyChoice"></select>
+  </label>
   <div class="deck-grid" id="deckGrid"></div>
 </div>
 
@@ -1384,6 +1429,7 @@
   <button class="table-hint-btn" id="tableHintBtn">&#128161; Hint</button>
   <button class="debug-next-btn" id="debugNextBtn">&#128269; Debug: next card</button>
   <h1 id="gameTitle">Escape Room Card Game</h1>
+  <div id="adventureStatus" class="adventure-status" aria-live="polite"></div>
 
   <div class="lives" id="livesDisplay"></div>
 
@@ -1445,6 +1491,8 @@
 <div class="win-overlay" id="winOverlay">
   <div class="win-card">
     <div class="win-title">&#127881; Congratulations!</div>
+    <p id="winStoryRecap"></p>
+    <p id="winErrorRecap"></p>
     <div class="win-stats">
       <div class="win-stat"><span class="win-stat-label">Time</span><span id="winTime"></span></div>
       <div class="win-stat"><span class="win-stat-label">Mistakes</span><span id="winMistakes"></span></div>
@@ -1457,10 +1505,12 @@
   </div>
 </div>
 
+<script src="story-content.js"></script>
+<script src="adventure-engine.js"></script>
 <script>
   const CARD_COUNT = 20;
   const STORY_NUMBER = 1;
-  const MAX_LIVES = 2;
+  const MAX_LIVES = 3;
   const PUZZLE_HINT_COUNT = 2;
   const TRAP_COUNT = 6;
   const CHAIN_LENGTH = CARD_COUNT - TRAP_COUNT;
@@ -1470,10 +1520,8 @@
   // once (instead of one linear next-card-only chain), numbers are random
   // instead of counting up, and unused slots are traps. Table size and the
   // used/trap split both vary randomly within these ranges on every deal.
-  const STORY_MODE_TABLE_SIZE_MIN = 40;
-  const STORY_MODE_TABLE_SIZE_MAX = 80;
-  const STORY_MODE_USED_RATIO_MIN = 0.6;
-  const STORY_MODE_USED_RATIO_MAX = 0.9;
+  const STORY_MODE_TABLE_SIZE_MIN = 54;
+  const STORY_MODE_TABLE_SIZE_MAX = 72;
   const STORY_MODE_NUMBER_MIN = 0;
   const STORY_MODE_NUMBER_MAX = 199;
   // Every story-mode card sits in a grid this many columns wide, always —
@@ -1483,55 +1531,12 @@
   const STORY_TABLE_COLS = 4;
 
   function randomInt(min, max) {
-    return min + Math.floor(Math.random() * (max - min + 1));
+    return min + Math.floor(gameRandom() * (max - min + 1));
   }
 
   function pickRandom(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
+    return arr[Math.floor(gameRandom() * arr.length)];
   }
-
-  // A different premise each game, instead of always "Help Lucy...".
-  const STORY_INTROS = [
-    'Help Lucy find her lost dog!',
-    'You’re locked in the library after hours!',
-    'A torn treasure map needs piecing together!',
-    'The wizard’s tower has sealed shut!',
-    'Something strange stirs in these woods!',
-    'The museum locks down at midnight!',
-    'A storm has trapped you in the lighthouse!',
-    'Your train has stopped in the middle of nowhere!',
-    'The fortune teller left one last riddle!',
-    'You woke up in a mansion with no memory!',
-  ];
-
-  // Shown as a little narrative beat before a "flip over card X" hint, so no
-  // card is ever just a bare instruction.
-  const STORY_BEATS = [
-    'You spot a faint trail leading further in.',
-    'Something rustles just out of sight.',
-    'A clue catches your eye across the room.',
-    'You feel like you’re getting closer.',
-    'A note flutters down, pointing the way.',
-    'Something here feels promising.',
-    'You hear a faint sound nearby.',
-    'A glint of something catches your eye.',
-    'The trail continues, just a little further.',
-    'Your instincts say to keep looking.',
-    'A shadow shifts nearby — something’s here.',
-    'The air feels different here — you’re close.',
-    'You notice a detail you missed before.',
-    'This seems important — keep going.',
-  ];
-
-  // The little "you did it" beat on a combo card, paired with the item name.
-  const COMBO_PRAISE = [
-    'You made the',
-    'Success! You created the',
-    'It worked! You now have the',
-    'At last — you assembled the',
-    'Clever thinking! You built the',
-    'Excellent! You put together the',
-  ];
 
   const DECKS = {
     easy: {
@@ -1693,7 +1698,7 @@
     if (item.img) {
       return '<img class="item-art" src="' + item.img + '" alt="' + item.name + '">';
     }
-    return item.emoji;
+    return item.emoji || "";
   }
 
   function orderedNumbers(count) {
@@ -1703,7 +1708,7 @@
   function shuffle(arr) {
     const a = arr.slice();
     for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(gameRandom() * (i + 1));
       [a[i], a[j]] = [a[j], a[i]];
     }
     return a;
@@ -1787,8 +1792,8 @@
   ];
 
   function makeCipherPuzzle(target) {
-    const shift = 1 + Math.floor(Math.random() * 5);
-    const template = CIPHER_TEMPLATES[Math.floor(Math.random() * CIPHER_TEMPLATES.length)];
+    const shift = 1 + Math.floor(gameRandom() * 5);
+    const template = CIPHER_TEMPLATES[Math.floor(gameRandom() * CIPHER_TEMPLATES.length)];
     const phrase = template(numberToWords(target));
     const ciphertext = phrase.split('').map((ch) => {
       if (ch === ' ') return ' ';
@@ -1821,7 +1826,7 @@
   // revealed as a head start. Kept separate from makeCipherPuzzle() above
   // so the original shift version stays available too.
   function makeCryptogramPuzzle(target) {
-    const template = CIPHER_TEMPLATES[Math.floor(Math.random() * CIPHER_TEMPLATES.length)];
+    const template = CIPHER_TEMPLATES[Math.floor(gameRandom() * CIPHER_TEMPLATES.length)];
     const phrase = template(numberToWords(target));
 
     const usedLetters = Array.from(new Set(phrase.replace(/[^A-Z]/g, '').split('')));
@@ -1888,10 +1893,10 @@
     const tiles = SLIDER_SOLVED.slice();
     let blankIdx = tiles.indexOf(null);
     let lastIdx = -1;
-    const moves = 120 + Math.floor(Math.random() * 60);
+    const moves = 120 + Math.floor(gameRandom() * 60);
     for (let i = 0; i < moves; i++) {
       const options = sliderNeighbors(blankIdx).filter((n) => n !== lastIdx);
-      const swapIdx = options[Math.floor(Math.random() * options.length)];
+      const swapIdx = options[Math.floor(gameRandom() * options.length)];
       [tiles[blankIdx], tiles[swapIdx]] = [tiles[swapIdx], tiles[blankIdx]];
       lastIdx = blankIdx;
       blankIdx = swapIdx;
@@ -2069,7 +2074,7 @@
             openings = correctMask;
             let attempts = 0;
             while (openings === correctMask && attempts < 6) {
-              openings = rotateMask(correctMask, 1 + Math.floor(Math.random() * 3));
+              openings = rotateMask(correctMask, 1 + Math.floor(gameRandom() * 3));
               attempts++;
             }
           }
@@ -2339,13 +2344,13 @@
   ];
 
   function mediumHintText(target) {
-    const useSubtraction = Math.random() < 0.4;
+    const useSubtraction = gameRandom() < 0.4;
     if (useSubtraction) {
-      const b = 1 + Math.floor(Math.random() * 5);
+      const b = 1 + Math.floor(gameRandom() * 5);
       const a = target + b;
       return 'What is ' + a + ' - ' + b + '?';
     }
-    const a = target <= 1 ? 0 : 1 + Math.floor(Math.random() * (target - 1));
+    const a = target <= 1 ? 0 : 1 + Math.floor(gameRandom() * (target - 1));
     const b = target - a;
     return 'What is ' + a + ' + ' + b + '?';
   }
@@ -2370,7 +2375,7 @@
         }
       });
       if (options.length === 0) break;
-      const pick = options[Math.floor(Math.random() * options.length)];
+      const pick = options[Math.floor(gameRandom() * options.length)];
       pairFor[pick.sum] = [last, pick.other];
       used.add(pick.sum);
       pool.push(pick.sum);
@@ -2458,12 +2463,14 @@
     const progress = loadProgress();
     deckGridEl.innerHTML = '';
     Object.values(DECKS).forEach((deck) => {
-      const p = progress[deck.id] || {};
+      const progressId = deck.id==='story' ? 'story:'+(document.getElementById('storyChoice').value || 'lighthouse') : deck.id;
+      const p = progress[progressId] || {};
       const tile = document.createElement('button');
       tile.className = 'deck-tile';
+      tile.dataset.deck = deck.id;
       tile.style.borderColor = deck.accent;
       tile.innerHTML = `
-        <div class="deck-icon">${deck.icon}</div>
+        <div class="deck-icon">${deck.id === 'story' ? '<img class="story-cover" src="art/story/' + (document.getElementById('storyChoice').value || 'lighthouse') + '-cover.svg" alt="">' : deck.icon}</div>
         <div class="deck-info">
           <div class="deck-name">${deck.label}</div>
           <div class="deck-tagline">${deck.tagline}</div>
@@ -2502,9 +2509,14 @@
   }
 
   function goHome() {
+    runSerial++; runEnded=true;
+    winPending=false; currentPuzzleContext=null;
+    toastEl.classList.remove('show'); clearTimeout(toastTimeout);
+    if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     gameScreenEl.hidden = true;
     miniGamesScreenEl.hidden = true;
     homeScreenEl.hidden = false;
+    zoomOverlay.classList.remove('open');
     renderHome();
   }
 
@@ -2535,7 +2547,15 @@
   miniGamesHomeLinkEl.addEventListener('click', goHome);
 
   function startDeck(modeId) {
+    runSerial++;
+    winPending=false; currentPuzzleContext=null;
+    toastEl.classList.remove('show'); clearTimeout(toastTimeout);
+    if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     currentMode = modeId;
+    cardContent.clear(); currentTarget=null; flippedNumbers=new Set(); unlockedNumbers=new Set();
+    document.getElementById('adventureStatus').replaceChildren();
+    if(modeId==='story') activeStory=STORY_BOOK.find(b=>b.id===document.getElementById('storyChoice').value) || STORY_BOOK[0];
+    runEnded = false;
     gameTitleEl.textContent = DECKS[modeId].label + ' Deck';
     tableEl.innerHTML = '';
     winOverlayEl.classList.remove('open');
@@ -2654,7 +2674,7 @@
     void card.offsetWidth;
     card.classList.add('wrong');
     clearTimeout(card._wrongTimeout);
-    card._wrongTimeout = setTimeout(() => {
+    card._wrongTimeout = scheduleGame(() => {
       card.classList.remove('wrong');
     }, 900);
   }
@@ -2664,13 +2684,14 @@
     void card.offsetWidth;
     card.classList.add('correct');
     clearTimeout(card._correctTimeout);
-    card._correctTimeout = setTimeout(() => {
+    card._correctTimeout = scheduleGame(() => {
       card.classList.remove('correct');
     }, 900);
   }
 
   let audioCtx = null;
   function playCorrectSound() {
+    if (!soundEnabled) return;
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
@@ -2697,12 +2718,14 @@
   }
 
   function loseLife() {
+    if(runEnded || lives<=0) return;
     lives--;
     mistakes++;
     renderLives();
     if (lives <= 0) {
+      runEnded = true;
       showToast('Sorry, game over! Please try again.');
-      setTimeout(() => {
+      scheduleGame(() => {
         gameOverOverlayEl.classList.add('open');
       }, 500);
     } else {
@@ -2846,225 +2869,16 @@
     currentTarget = chain.length > 2 ? chain[2] : null;
   }
 
-  // --- Story Mode: branching chain builder ---
-  //
-  // Builds an abstract graph of `usedCount` nodes (ids 0..usedCount-1,
-  // created in the order below), independent of which real numbers end up
-  // on the cards — buildStoryCardContent() maps ids to numbers afterward.
-  //
-  // Node kinds:
-  //   story  — flavor text, explicitly unlocks 1-2 further nodes
-  //   puzzle — a cipher; solving it reveals exactly 1 further node
-  //   object — an item; unlocks nothing itself, just waits to be paired.
-  //            The two objects for the same combo are always dropped at
-  //            unrelated branch points, never as two siblings of the same
-  //            reveal — so flipping one never tells you "and its pair is
-  //            the card right next to it."
-  //   combo  — requires its two object nodes both flipped before it
-  //            unlocks (has no parent of its own — see flipStoryCard's
-  //            requires-check); once flipped it continues the chain like a
-  //            story node
-  //   win    — the escape card; every dead-end node unlocks it
-  //
-  // Nodes below MIN_BRANCH_DEPTH always get exactly one child (a forced
-  // linear "spine" out of the root) so a game can never fan out — and
-  // therefore can never dead-end — in the first couple of hops.
-  const MIN_BRANCH_DEPTH = 2;
-
-  function buildStoryGraph(usedCount) {
-    const nodes = [];
-    function makeNode(kind, depth) {
-      const node = {
-        id: nodes.length, kind, depth, unlocks: [], requires: null,
-        isStart: false, isWin: false,
-      };
-      nodes.push(node);
-      return node;
-    }
-
-    const root = makeNode('story', 0);
-    root.isStart = true;
-
-    // Reserve one slot for root and one for the win card that closes every
-    // dead-end branch, so the graph always lands on exactly usedCount nodes.
-    let budget = usedCount - 2;
-    const queue = [root];
-
-    // Precompute a well-spread sequence of ingredient-drop events, two per
-    // combo (one per side), so the same combo's two ingredients always land
-    // many nodes apart instead of together.
-    const comboCount = Math.min(COMBO_SETS.length, Math.max(1, Math.floor(budget / 7)));
-    let ingredientTokens = [];
-    for (let i = 0; i < comboCount; i++) ingredientTokens.push(i, i);
-    ingredientTokens = shuffle(ingredientTokens);
-    const minGap = Math.max(3, Math.floor(ingredientTokens.length / 2));
-    for (let i = 0; i < ingredientTokens.length; i++) {
-      for (let j = i + 1; j < ingredientTokens.length && j < i + minGap; j++) {
-        if (ingredientTokens[i] !== ingredientTokens[j]) continue;
-        for (let k = j + 1; k < ingredientTokens.length; k++) {
-          if (ingredientTokens[k] !== ingredientTokens[i]) {
-            [ingredientTokens[j], ingredientTokens[k]] = [ingredientTokens[k], ingredientTokens[j]];
-            break;
-          }
-        }
-      }
-    }
-    let tokenIdx = 0;
-    const pendingIngredient = {};
-    const completedCombos = new Set();
-
-    while (queue.length && budget > 0) {
-      const node = queue.shift();
-      // A puzzle only ever reveals a single answer, so it can't branch —
-      // it always gets exactly one child. That one child CAN still be a
-      // combo ingredient though (solving the puzzle reveals an item card,
-      // same as any other card) — excluding puzzles from ever dropping one
-      // used to starve combos of eligible opportunities whenever a run of
-      // consecutive puzzle nodes ate up most of the budget.
-      const isPuzzle = node.kind === 'puzzle';
-      const canBranch = node.depth >= MIN_BRANCH_DEPTH;
-
-      const wantsTwo = !isPuzzle && canBranch && budget >= 2 && Math.random() < 0.35;
-      const childCount = isPuzzle ? 1 : (wantsTwo ? 2 : 1);
-      let droppedIngredient = false;
-
-      for (let i = 0; i < childCount && budget > 0; i++) {
-        const tokensLeft = ingredientTokens.length - tokenIdx;
-        const nextComboIndex = tokenIdx < ingredientTokens.length ? ingredientTokens[tokenIdx] : null;
-        // Completing an already-pending combo is much more eager than
-        // starting a fresh one, and once remaining budget gets tight
-        // relative to how many tokens are still unplaced, placement
-        // becomes forced — so a pair can never fail to both land before
-        // the graph runs out of room, even though *when* a pair starts is
-        // still spread out and random.
-        const isFinish = nextComboIndex !== null && pendingIngredient[nextComboIndex] !== undefined;
-        const mustForce = tokensLeft > 0 && tokensLeft >= budget - 1;
-        const dropChance = isFinish ? 0.85 : 0.3;
-        const wantsIngredient = canBranch && !droppedIngredient &&
-          nextComboIndex !== null && (mustForce || Math.random() < dropChance);
-
-        if (wantsIngredient) {
-          droppedIngredient = true;
-          const comboIndex = ingredientTokens[tokenIdx++];
-          const obj = makeNode('object', node.depth + 1);
-          node.unlocks.push(obj.id);
-          budget -= 1;
-          if (pendingIngredient[comboIndex] === undefined) {
-            pendingIngredient[comboIndex] = obj.id;
-          } else {
-            const otherId = pendingIngredient[comboIndex];
-            delete pendingIngredient[comboIndex];
-            completedCombos.add(comboIndex);
-            const combo = makeNode('combo', node.depth + 1);
-            combo.requires = [otherId, obj.id];
-            queue.push(combo);
-            budget -= 1;
-          }
-        } else {
-          // Weighted toward puzzles — plain "flip over card X" filler
-          // beats are the least interesting card in the game, so they
-          // should be the minority, not the majority.
-          const kind = Math.random() < 0.3 ? 'story' : 'puzzle';
-          const child = makeNode(kind, node.depth + 1);
-          node.unlocks.push(child.id);
-          queue.push(child);
-          budget -= 1;
-        }
-      }
-    }
-
-    // Safety net: two ways a combo can still be unresolved here — either it
-    // got one ingredient dropped but never the second, or the tree ran out
-    // of eligible nodes before its token was ever reached in the sequence
-    // at all (more likely now that a chunk of budget goes to dead-end
-    // ingredient/object leaves instead of nodes that keep the queue going).
-    // Either way, force it in now rather than silently lose that combo or
-    // leave a dangling, unpairable item on the table. Each one gets its own
-    // fresh carrier node(s), chained one after another (root -> carrier1 ->
-    // combo1 -> carrier2 -> combo2 -> ...) instead of piling onto one card —
-    // no single card should ever end up naming 3+ numbers just because
-    // several combos happened to need this fallback in the same game.
-    let danglingHost = root;
-    function attachCarrier(kind) {
-      const carrier = makeNode(kind, danglingHost.depth + 1);
-      danglingHost.unlocks.push(carrier.id);
-      danglingHost = carrier;
-      return carrier;
-    }
-    for (let comboIndex = 0; comboIndex < comboCount; comboIndex++) {
-      if (completedCombos.has(comboIndex)) continue;
-      let firstId = pendingIngredient[comboIndex];
-      if (firstId === undefined) {
-        // This carrier needs to hold both the ingredient AND the next
-        // thing chained after it, so it has to be 'story' — a 'puzzle'
-        // node can only ever have the one answer.
-        const firstCarrier = attachCarrier('story');
-        const firstObj = makeNode('object', firstCarrier.depth + 1);
-        firstCarrier.unlocks.push(firstObj.id);
-        firstId = firstObj.id;
-      }
-      // This one only ever needs to hold the single ingredient, so it can
-      // follow the normal puzzle-weighted mix like everything else instead
-      // of always being 'story'.
-      const carrier = attachCarrier(Math.random() < 0.3 ? 'story' : 'puzzle');
-      const obj = makeNode('object', carrier.depth + 1);
-      carrier.unlocks.push(obj.id);
-      const combo = makeNode('combo', carrier.depth + 1);
-      combo.requires = [firstId, obj.id];
-      danglingHost = combo;
-    }
-
-    const win = makeNode('win', 0);
-    win.isWin = true;
-    nodes.forEach((n) => {
-      if (n === win || n.kind === 'object') return;
-      if (n.unlocks.length === 0) n.unlocks.push(win.id);
-    });
-
-    // Safety net: with 30% story / 70% puzzle odds this is astronomically
-    // likely already, but guarantee at least one puzzle exists regardless.
-    // Only a node with a single unlock is eligible — a puzzle only ever
-    // reveals one answer, so converting a busier node would strand its
-    // other children.
-    if (!nodes.some((n) => n.kind === 'puzzle')) {
-      const candidate = nodes.find((n) => n.kind === 'story' && !n.isStart && n.unlocks.length <= 1);
-      if (candidate) candidate.kind = 'puzzle';
-    }
-
-    return nodes;
+  // Story chapters are authored as interleaved discoveries in adventure-engine.js.
+  function buildStoryGraph() {
+    return buildAdventureGraph();
   }
 
   // Hands each combo's two (always-fresh) ingredient nodes a matching
   // illustrated triad when artwork remains, otherwise a plain emoji item.
   function assignStoryItems(nodes) {
-    const itemForId = {};
-    const comboPool = shuffle(COMBO_SETS.slice());
-    const emojiPool = shuffle(ITEMS.slice());
-
-    function nextEmoji() {
-      if (emojiPool.length === 0) emojiPool.push(...shuffle(ITEMS.slice()));
-      return emojiPool.pop();
-    }
-
-    nodes.forEach((n) => {
-      if (n.kind !== 'combo') return;
-      const [aId, bId] = n.requires;
-      if (comboPool.length > 0) {
-        const combo = comboPool.pop();
-        itemForId[aId] = combo.a;
-        itemForId[bId] = combo.b;
-        itemForId[n.id] = combo.c;
-      } else {
-        itemForId[aId] = nextEmoji();
-        itemForId[bId] = nextEmoji();
-        itemForId[n.id] = nextEmoji();
-      }
-    });
-
-    return itemForId;
-  }
-
-  function describeUnlocks(nums) {
+    return assignAdventureItems(nodes);
+  }  function describeUnlocks(nums) {
     if (!nums || nums.length === 0) return '';
     if (nums.length === 1) return 'Flip over card ' + nums[0] + '!';
     if (nums.length === 2) return 'Flip over cards ' + nums.join(' and ') + '!';
@@ -3131,10 +2945,10 @@
   // ordinary numbers drawn from the same shared pool as everything else
   // (so a combo can be as small as 10 + 5 = 15), retried until their sum
   // also happens to be a number nothing else has claimed yet.
-  function buildStoryCardContent(tableSize, usedCount) {
+  function buildStoryCardContent(tableSize) {
     cardContent.clear();
 
-    const nodes = buildStoryGraph(usedCount);
+    const nodes = buildStoryGraph();
     const comboNodes = nodes.filter((n) => n.kind === 'combo');
     const otherNodes = nodes.filter((n) => n.kind !== 'combo' && n.kind !== 'object');
 
@@ -3142,35 +2956,30 @@
     const pool = shuffle(Array.from({ length: poolSize }, (_, i) => STORY_MODE_NUMBER_MIN + i));
 
     const numberForId = {};
-    comboNodes.forEach((combo) => {
-      // Random indices each attempt (not pop/push off the same end) so a
-      // failed pair is never just retried unchanged forever.
-      let a, b, sum, valid = false;
-      for (let attempt = 0; attempt < 300 && pool.length >= 2 && !valid; attempt++) {
-        const i = Math.floor(Math.random() * pool.length);
-        let j = Math.floor(Math.random() * pool.length);
-        while (j === i) j = Math.floor(Math.random() * pool.length);
-        a = pool[i];
-        b = pool[j];
-        sum = a + b;
-        if (sum <= STORY_MODE_NUMBER_MAX && sum !== a && sum !== b && pool.includes(sum)) {
-          const toRemove = new Set([a, b, sum]);
-          for (let k = pool.length - 1; k >= 0; k--) {
-            if (toRemove.has(pool[k])) pool.splice(k, 1);
-          }
-          valid = true;
-        }
+    const histogram = [0,0,0,0];
+    const take = n => { pool.splice(pool.indexOf(n),1); histogram[Math.floor(n/50)]++; return n; };
+    comboNodes.forEach(combo => {
+      const available = new Set(pool), candidates=[];
+      for (const a of pool) for (const b of pool) {
+        const sum=a+b;
+        if(a>=b || !a || !b || sum>199 || !available.has(sum)) continue;
+        const score=histogram[Math.floor(a/50)]+histogram[Math.floor(b/50)]+histogram[Math.floor(sum/50)];
+        candidates.push({a,b,sum,score});
       }
-      const [aId, bId] = combo.requires;
-      if (Math.random() < 0.5) { numberForId[aId] = a; numberForId[bId] = b; }
-      else { numberForId[aId] = b; numberForId[bId] = a; }
-      numberForId[combo.id] = sum;
+      if(!candidates.length) throw Error('No free combination values');
+      const best=Math.min(...candidates.map(c=>c.score));
+      const pick=pickRandom(candidates.filter(c=>c.score===best));
+      const [aId,bId]=combo.requires;
+      numberForId[aId]=take(pick.a); numberForId[bId]=take(pick.b); numberForId[combo.id]=take(pick.sum);
     });
-
-    otherNodes.forEach((n) => { numberForId[n.id] = pool.pop(); });
+    function balancedTake() {
+      const min=Math.min(...pool.map(n=>histogram[Math.floor(n/50)]));
+      return take(pickRandom(pool.filter(n=>histogram[Math.floor(n/50)]===min)));
+    }
+    otherNodes.forEach(n=>{ numberForId[n.id]=balancedTake(); });
     const trapCount = Math.max(0, tableSize - nodes.length);
     const trapNumbers = [];
-    for (let i = 0; i < trapCount && pool.length; i++) trapNumbers.push(pool.pop());
+    for (let i = 0; i < trapCount && pool.length; i++) trapNumbers.push(balancedTake());
 
     // True ascending order, always — a named number is easy to scan for,
     // and it means findDirectionalHints below can trust grid position to
@@ -3179,6 +2988,8 @@
     const directionForId = findDirectionalHints(nodes, numberForId, orderedNumbers);
 
     const itemForId = assignStoryItems(nodes);
+    const puzzleBag = [];
+    function nextPuzzle() { if(!puzzleBag.length) puzzleBag.push(...shuffle(PUZZLE_GENERATORS)); return puzzleBag.pop(); }
 
     nodes.forEach((n) => {
       const num = numberForId[n.id];
@@ -3193,14 +3004,17 @@
       let hasBeat = false;
 
       if (n.isStart) {
-        message = pickRandom(STORY_INTROS);
+        message = activeStory.intro;
         hint = describeUnlocks(unlockNums);
       } else if (n.isWin) {
-        message = '\u{1F389} You escaped!';
+        message = activeStory.ending;
         hint = 'The End';
       } else if (n.kind === 'puzzle') {
-        const generator = pickRandom(PUZZLE_GENERATORS);
+        const generator = nextPuzzle();
         puzzle = generator.make(unlockNums[0]);
+        puzzle.answers = unlockNums.slice();
+        message = activeStory.recipes[n.chapter][7];
+        hasBeat = true;
         hint = generator.hint;
       } else if (n.kind === 'object') {
         // No "combine with ___" pointer — the player has to notice the
@@ -3209,7 +3023,7 @@
       } else if (n.kind === 'combo') {
         // The payoff card: confirms what got made and, like a story card,
         // still has to say what to flip next — losing this was the bug.
-        message = pickRandom(COMBO_PRAISE) + ' ' + (backItem ? backItem.name : 'item') + '!';
+        message = activeStory.recipes[n.chapter][6];
         hint = directionForId[n.id] ? DIRECTION_HINTS[directionForId[n.id]] : describeUnlocks(unlockNums);
         hasBeat = true;
       } else {
@@ -3217,12 +3031,13 @@
         // unless its one real next card just happens to already sit
         // immediately next to it on the true-ascending-order board, in
         // which case it occasionally gets to point that out directly.
-        message = pickRandom(STORY_BEATS);
+        message = activeStory.recipes[n.chapter][7];
         hint = directionForId[n.id] ? DIRECTION_HINTS[directionForId[n.id]] : describeUnlocks(unlockNums);
         hasBeat = true;
       }
 
       cardContent.set(num, {
+        isProgress: true, kind: n.kind, chapter: n.chapter, title: n.isStart ? activeStory.title : n.isWin ? "Home safely" : backItem ? backItem.name : "Chapter " + (n.chapter + 1),
         isStory: n.isStart, isWin: n.isWin, isSeed: n.isStart, hasBeat,
         unlocks: unlockNums, requires: requiresNums,
         message, hint, backItem, puzzle,
@@ -3236,6 +3051,8 @@
     flippedNumbers = new Set([rootNumber]);
     unlockedNumbers = new Set(cardContent.get(rootNumber).unlocks);
 
+    const validation = validateAdventure(cardContent, orderedNumbers);
+    if (!validation.ok) throw Error(validation.errors.join('; '));
     return orderedNumbers;
   }
 
@@ -3243,19 +3060,19 @@
   // unlocks, then re-checks every pending combo in case this was the second
   // of its two required ingredients.
   function flipStoryCard(num, content) {
-    unlockedNumbers.delete(num);
     flippedNumbers.add(num);
-    content.unlocks.forEach((n) => unlockedNumbers.add(n));
-    cardContent.forEach((c, cardNum) => {
-      if (!c.requires || flippedNumbers.has(cardNum)) return;
-      const [a, b] = c.requires;
-      if (flippedNumbers.has(a) && flippedNumbers.has(b)) {
-        unlockedNumbers.add(cardNum);
-      }
-    });
+    refreshStoryUnlocks();
   }
 
-  function tableSizeForMode(mode) {
+  function refreshStoryUnlocks() {
+    if(currentMode !== 'story') return;
+    unlockedNumbers = availableAdventureCards(cardContent, flippedNumbers);
+    updateAdventureStatus();
+  }
+
+  function onPuzzleSolved(content,num) {
+    if (num !== null && currentMode === 'story' && cardContent.get(num) === content) refreshStoryUnlocks();
+  }  function tableSizeForMode(mode) {
     // Story Mode's table size isn't decided until it's dealt, so the
     // pre-deal preview shows the range rather than a committed number.
     return mode === 'story' ? (STORY_MODE_TABLE_SIZE_MIN + '–' + STORY_MODE_TABLE_SIZE_MAX) : CARD_COUNT;
@@ -3267,6 +3084,19 @@
   }
 
   function performDeal() {
+    runSerial++;
+    winPending=false; currentPuzzleContext=null;
+    toastEl.classList.remove('show'); clearTimeout(toastTimeout);
+    if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
+    runSeed = pendingSeed === null ? crypto.getRandomValues(new Uint32Array(1))[0] : pendingSeed;
+    pendingSeed = null;
+    runEnded = false; mistakeLog = []; assistedRun = false;
+    withGameSeed(runSeed, dealGeneratedCards);
+    updateAdventureStatus();
+    fitTableText();
+  }
+
+  function dealGeneratedCards() {
     tableEl.innerHTML = '';
     winOverlayEl.classList.remove('open');
     gameOverOverlayEl.classList.remove('open');
@@ -3277,11 +3107,9 @@
       // Table size and the used/trap split both vary every deal, including
       // on "Play Again" — no two games have the same shape.
       const tableSize = randomInt(STORY_MODE_TABLE_SIZE_MIN, STORY_MODE_TABLE_SIZE_MAX);
-      const usedRatio = STORY_MODE_USED_RATIO_MIN + Math.random() * (STORY_MODE_USED_RATIO_MAX - STORY_MODE_USED_RATIO_MIN);
-      const usedCount = Math.round(tableSize * usedRatio);
       // Already sorted ascending — a "flip over card 47" hint is easy to
       // scan for instead of a hunt.
-      numbers = buildStoryCardContent(tableSize, usedCount);
+      numbers = buildStoryCardContent(tableSize);
     } else {
       numbers = orderedNumbers(CARD_COUNT);
       buildCardContent(currentMode, numbers);
@@ -3301,7 +3129,7 @@
       // every plain story beat all carry real flavor text — the generic
       // "Nicely done!" on every legacy-mode card was just clutter that
       // pushed the hint off the card, so that one's still suppressed.
-      const messageInner = (content.isStory || content.isWin || content.hasBeat) ? `<div class="message">${content.message}</div>` : '';
+      const messageInner = (content.isStory || content.isWin || content.hasBeat) ? `<div class="message">${content.title || content.message}</div>` : '';
       // Ingredient (object) cards are just the picture with no hint text —
       // the player has to notice the pairing themselves. Everything else,
       // including a combo's own "flip over card X" payoff, still needs it.
@@ -3325,12 +3153,14 @@
 
       card.addEventListener('click', () => {
         clearTableHintHighlight();
+        if (runEnded || winPending || lives <= 0) return;
         if (card.classList.contains('flipped')) {
           openZoom(num);
           return;
         }
         const isCorrect = currentMode === 'story' ? unlockedNumbers.has(num) : num === currentTarget;
-        if (!isCorrect) {
+        if (!isCorrect || isTargetPuzzleGated(num)) {
+          mistakeLog.push({card:num,elapsedMs:Date.now()-startTime,reason:isCorrect?'Puzzle not solved':'Wrong or premature card'});
           triggerWrongFeedback(card);
           loseLife();
           return;
@@ -3344,7 +3174,8 @@
           currentTarget = content.next;
         }
         if (content.isWin) {
-          setTimeout(triggerWin, 700);
+          winPending=true;
+          scheduleGame(triggerWin, 700);
         }
       });
       tableEl.appendChild(card);
@@ -3371,21 +3202,27 @@
   // --- Win flow ---
 
   function triggerWin() {
+    if(runEnded || lives<=0 || currentMode==='story' && ![...cardContent].every(([n,c])=>!c.isProgress || flippedNumbers.has(n))) return;
+    runEnded=true;
     const elapsedMs = Date.now() - startTime;
     const progress = loadProgress();
-    const prev = progress[currentMode] || {};
+    const progressId = currentMode==='story' ? 'story:'+activeStory.id : currentMode;
+    const prev = progress[progressId] || {};
     const isNewBest = !prev.bestTimeMs || elapsedMs < prev.bestTimeMs;
-    progress[currentMode] = {
+    progress[progressId] = {
       completed: true,
       bestTimeMs: isNewBest ? elapsedMs : prev.bestTimeMs,
     };
-    saveProgress(progress);
+    if(!assistedRun) saveProgress(progress);
+    document.getElementById('winStoryRecap').textContent = currentMode==='story' ? activeStory.ending : 'Every clue led you here. Well done!';
+    document.getElementById('winErrorRecap').textContent = mistakeLog.length ? 'Cards tried too soon or incorrectly: '+mistakeLog.map(m=>'#'+m.card).join(', ') : 'No wrong cards.';
+    if(assistedRun) document.getElementById('winErrorRecap').textContent += ' Practice run: completion and records were not saved.';
 
     winTimeEl.textContent = formatTime(elapsedMs);
     winMistakesEl.textContent = mistakes === 0
       ? 'None — perfect run!'
       : mistakes + (mistakes === 1 ? ' mistake' : ' mistakes');
-    winNewBestEl.hidden = !isNewBest;
+    winNewBestEl.hidden = !isNewBest || assistedRun;
     winOverlayEl.classList.add('open');
   }
 
@@ -3403,9 +3240,10 @@
 
   function openZoom(num) {
     const content = cardContent.get(num);
+    currentPuzzleContext={content,num};
     zoomCardEl.classList.toggle('story', content.isStory);
     zoomCardEl.classList.toggle('win', content.isWin);
-    zoomNumberEl.textContent = 'Card ' + num;
+    zoomNumberEl.textContent = 'Card ' + num + (content.backItem ? ' · ' + content.backItem.name : '');
     if (content.backItem) {
       zoomItemArtEl.innerHTML = itemVisual(content.backItem);
       zoomItemArtEl.hidden = false;
@@ -3423,7 +3261,7 @@
     if (showPuzzle) {
       renderPuzzle(content, num);
     } else {
-      zoomHintEl.innerHTML = content.puzzle ? ('Flip over card ' + content.puzzle.answer + '!') : content.hint;
+      zoomHintEl.innerHTML = content.puzzle ? puzzleResultText(content.puzzle) : content.hint;
     }
 
     zoomOverlay.classList.add('open');
@@ -3432,6 +3270,7 @@
   // Dispatches to the right puzzle-type renderer. Each renderer owns its
   // own grid container and hides the others.
   function renderPuzzle(content, num, opts) {
+    if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     if (content.puzzle.type === 'slider') {
       renderSliderPuzzle(content, num, opts);
     } else if (content.puzzle.type === 'swap') {
@@ -3540,6 +3379,7 @@
 
     function solvePuzzle() {
       p.solved = true;
+      onPuzzleSolved(content, num);
       hintedIndices = new Set();
       updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
@@ -3547,14 +3387,15 @@
         puzzleFeedbackEl.textContent = '✓ Solved! ' + p.plaintext + ' (' + p.answer + ')';
         puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.textContent = '✓ Correct! ' + puzzleResultText(p);
         const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
+        if (cardHintEl) cardHintEl.textContent = puzzleResultText(p);
+        scheduleGame(() => {
+          if(currentPuzzleContext?.content !== content || currentPuzzleContext?.num !== num) return;
           zoomCardEl.classList.remove('has-puzzle');
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          zoomHintEl.textContent = puzzleResultText(p);
         }, 900);
       }
     }
@@ -3715,19 +3556,21 @@
 
     function solvePuzzle() {
       p.solved = true;
+      onPuzzleSolved(content, num);
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
       if (isTest) {
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
         puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.textContent = '✓ Correct! ' + puzzleResultText(p);
         const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
+        if (cardHintEl) cardHintEl.textContent = puzzleResultText(p);
+        scheduleGame(() => {
+          if(currentPuzzleContext?.content !== content || currentPuzzleContext?.num !== num) return;
           zoomCardEl.classList.remove('has-puzzle');
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          zoomHintEl.textContent = puzzleResultText(p);
         }, 900);
       }
     }
@@ -3831,6 +3674,7 @@
 
     function solvePuzzle() {
       p.solved = true;
+      onPuzzleSolved(content, num);
       hintedIndices = new Set();
       updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
@@ -3838,14 +3682,15 @@
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
         puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.textContent = '✓ Correct! ' + puzzleResultText(p);
         const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
+        if (cardHintEl) cardHintEl.textContent = puzzleResultText(p);
+        scheduleGame(() => {
+          if(currentPuzzleContext?.content !== content || currentPuzzleContext?.num !== num) return;
           zoomCardEl.classList.remove('has-puzzle');
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          zoomHintEl.textContent = puzzleResultText(p);
         }, 900);
       }
     }
@@ -3947,6 +3792,7 @@
 
     function solvePuzzle() {
       p.solved = true;
+      onPuzzleSolved(content, num);
       hintedKey = null;
       updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
@@ -3954,14 +3800,15 @@
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
         puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.textContent = '✓ Correct! ' + puzzleResultText(p);
         const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
+        if (cardHintEl) cardHintEl.textContent = puzzleResultText(p);
+        scheduleGame(() => {
+          if(currentPuzzleContext?.content !== content || currentPuzzleContext?.num !== num) return;
           zoomCardEl.classList.remove('has-puzzle');
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          zoomHintEl.textContent = puzzleResultText(p);
         }, 900);
       }
     }
@@ -4048,6 +3895,13 @@
     updateHintButton();
     puzzleHintEl.onclick = useHint;
 
+    puzzleCleanup = () => {
+      if(drag) {
+        drag.piece.placed=!!drag.originalOrigin;
+        drag.piece.placedOrigin=drag.originalOrigin;
+        endDrag(); drag=null;
+      }
+    };
     let drag = null; // { piece, pointerId, startX, startY, originalOrigin, ghostEl, widthPx, heightPx, moved, candidateRow, candidateCol }
     let hintedPieceId = null;
 
@@ -4064,18 +3918,12 @@
     // so it's obvious a piece just got placed for them and which one.
     function useHint() {
       if (p.solved || p.hintsRemaining <= 0) return;
-      const covered = shapesCoverage(p);
-      const candidate = p.pieces.find((pc) => !pc.placed && shapesCanPlace(
-        { currentCells: pc.solvedCells }, pc.solvedOrigin[0], pc.solvedOrigin[1], p.rows, p.cols, covered
-      ));
-      if (!candidate) return;
-      candidate.currentCells = candidate.solvedCells;
-      candidate.placed = true;
-      candidate.placedOrigin = candidate.solvedOrigin;
-      p.hintsRemaining--;
-      hintedPieceId = candidate.id;
-      puzzleFeedbackEl.textContent = '\u{1F4A1} Hint used — placed a piece for you!';
-      puzzleFeedbackEl.className = 'puzzle-feedback hint';
+      if(drag) return;
+      const result = placeShapeHint(p);
+      if(!result) return;
+      hintedPieceId=result.id;
+      puzzleFeedbackEl.textContent = result.moved ? 'Moved '+result.moved+' blocking piece(s) back to the tray and placed a piece. A complete solution is still possible.' : 'Placed a piece for you. The remaining pieces still fit!';
+      puzzleFeedbackEl.className='puzzle-feedback hint';
       updateHintButton();
       render();
       if (shapesIsSolved(p)) {
@@ -4086,20 +3934,22 @@
 
     function solvePuzzle() {
       p.solved = true;
+      onPuzzleSolved(content, num);
       updateHintButton();
       puzzleFeedbackEl.className = 'puzzle-feedback correct';
       if (isTest) {
         puzzleFeedbackEl.textContent = '✓ Solved! (' + p.answer + ')';
         puzzleAgainEl.hidden = false;
       } else {
-        puzzleFeedbackEl.textContent = '✓ Correct! Flip over card ' + p.answer + '!';
+        puzzleFeedbackEl.textContent = '✓ Correct! ' + puzzleResultText(p);
         const cardHintEl = document.querySelector('.card[data-number="' + num + '"] .hint');
-        if (cardHintEl) cardHintEl.textContent = 'Flip over card ' + p.answer + '!';
-        setTimeout(() => {
+        if (cardHintEl) cardHintEl.textContent = puzzleResultText(p);
+        scheduleGame(() => {
+          if(currentPuzzleContext?.content !== content || currentPuzzleContext?.num !== num) return;
           zoomCardEl.classList.remove('has-puzzle');
           zoomHintEl.hidden = false;
           zoomPuzzleEl.hidden = true;
-          zoomHintEl.textContent = 'Flip over card ' + p.answer + '!';
+          zoomHintEl.textContent = puzzleResultText(p);
         }, 900);
       }
     }
@@ -4121,7 +3971,7 @@
         }
       }
       document.body.appendChild(ghost);
-      return { ghost, widthPx: (maxC + 1) * SHAPES_CELL_PX, heightPx: (maxR + 1) * SHAPES_CELL_PX };
+      return { ghost, widthPx: maxC * SHAPES_GRID_PITCH_PX + SHAPES_CELL_PX, heightPx: maxR * SHAPES_GRID_PITCH_PX + SHAPES_CELL_PX };
     }
 
     function positionGhost(clientX, clientY) {
@@ -4139,6 +3989,7 @@
     function startDrag(piece, evt) {
       if (p.solved) return;
       evt.preventDefault();
+      shapesAreaEl.setPointerCapture(evt.pointerId);
       hintedPieceId = null;
       puzzleFeedbackEl.textContent = '';
       puzzleFeedbackEl.className = 'puzzle-feedback';
@@ -4173,6 +4024,7 @@
       window.removeEventListener('pointermove', onDragMove);
       window.removeEventListener('pointerup', onDragEnd);
       window.removeEventListener('pointercancel', onDragEnd);
+      if(shapesAreaEl.hasPointerCapture(drag.pointerId)) shapesAreaEl.releasePointerCapture(drag.pointerId);
       drag.ghostEl.remove();
     }
 
@@ -4182,7 +4034,7 @@
       endDrag();
       drag = null;
 
-      if (!moved) {
+      if (!moved || evt.type === 'pointercancel') {
         // A tap, not a drag: there's nothing to rotate, so just settle the
         // piece back exactly where it was.
         if (originalOrigin) {
@@ -4260,8 +4112,9 @@
         const cellSet = new Set(piece.currentCells.map(([r, c]) => r + ',' + c));
         const wrap = document.createElement('div');
         wrap.className = 'shapes-piece';
-        wrap.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 14px)';
-        wrap.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', 14px)';
+        wrap.dataset.pieceId = piece.id;
+        wrap.style.gridTemplateColumns = 'repeat(' + (maxC + 1) + ', 20px)';
+        wrap.style.gridTemplateRows = 'repeat(' + (maxR + 1) + ', 20px)';
         for (let r = 0; r <= maxR; r++) {
           for (let c = 0; c <= maxC; c++) {
             const cellEl = document.createElement('div');
@@ -4292,7 +4145,7 @@
     let content = null;
 
     if (MINI_GAMES[type]) {
-      const target = 1 + Math.floor(Math.random() * CARD_COUNT);
+      const target = 1 + Math.floor(gameRandom() * CARD_COUNT);
       const makers = {
         cryptogram: makeCryptogramPuzzle, cipher: makeCipherPuzzle,
         slider: makeSliderPuzzle, swap: makeSwapPuzzle, pipes: makePipesPuzzle, shapes: makeShapesPuzzle,
@@ -4307,6 +4160,7 @@
     }
 
     if (!content) return;
+    currentPuzzleContext={content,num:null};
 
     zoomCardEl.classList.remove('story', 'win');
     zoomCardEl.classList.add('has-puzzle');
@@ -4323,6 +4177,8 @@
   }
 
   function closeZoom() {
+    currentPuzzleContext=null;
+    if(puzzleCleanup) {puzzleCleanup();puzzleCleanup=null;}
     zoomOverlay.classList.remove('open');
   }
 
@@ -4338,21 +4194,8 @@
 
   renderHome();
 
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {});
-    });
-    // Without this, a newly-activated service worker (see sw.js's
-    // skipWaiting/clients.claim) takes over silently, but the page you
-    // already have open keeps running the OLD html/js/css it loaded with —
-    // nothing makes it actually pick up the update until you happen to
-    // reload some other way. This reloads automatically the moment a new
-    // version takes control.
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      window.location.reload();
-    });
-  }
 </script>
 
+<script src="app-ui.js"></script>
 </body>
 </html>
